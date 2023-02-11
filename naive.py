@@ -10,6 +10,7 @@ RECT_W = 100
 RECT_H = 100
 # RECT_Vx = 10
 # RECT_Vy = 10
+factor = 10
 
 # initialize the capture object
 cap = cv2.VideoCapture(0)
@@ -76,12 +77,12 @@ while True:
         l1 = np.ones(9)*1e9
         for i,dir in enumerate(dirs):
             # get the adjacent pixels absolute difference with last square
-            if start_point[1]+dir[1]*RECT_W/2 <= 0 or end_point[1]+dir[1]*RECT_W/2 >= FRAME_H or start_point[0]+dir[0]*RECT_W/2 <= 0 or end_point[0]+dir[0]*RECT_W/2 >= FRAME_W:
+            if start_point[1]+dir[1]*RECT_W/factor <= 0 or end_point[1]+dir[1]*RECT_W/factor >= FRAME_H or start_point[0]+dir[0]*RECT_W/factor <= 0 or end_point[0]+dir[0]*RECT_W/factor >= FRAME_W:
                 print("BAD")
             else:
                 # print(start_point[1],dir[1]*RECT_W/2)
                 # print(start_point[1]+dir[1]*RECT_W/2,end_point[1]+dir[1]*RECT_W/2,start_point[0]+dir[0]*RECT_W/2,end_point[0]+dir[0]*RECT_W/2)
-                pred_px = img[start_point[1]+dir[1]*RECT_W//2:end_point[1]+dir[1]*RECT_W//2,start_point[0]+dir[0]*RECT_W//2:end_point[0]+dir[0]*RECT_W//2]
+                pred_px = img[start_point[1]+dir[1]*RECT_W//factor:end_point[1]+dir[1]*RECT_W//factor,start_point[0]+dir[0]*RECT_W//factor:end_point[0]+dir[0]*RECT_W//factor]
                 l1[i] = np.sum(np.abs(pred_px.astype(int)-last_rect_px.astype(int)))
                 if DEBUG_MODE:
                     cv2.imwrite("patch"+str(dir)+".png",pred_px)
@@ -92,10 +93,10 @@ while True:
             show_patches()
         closest = np.argmin(l1)
         print(dirs[closest])
-        start_point[0] += dirs[closest][0]*RECT_W/2
-        start_point[1] += dirs[closest][1]*RECT_W/2
-        end_point[0] += dirs[closest][0]*RECT_W/2
-        end_point[1] += dirs[closest][1]*RECT_W/2
+        start_point[0] += dirs[closest][0]*RECT_W/factor
+        start_point[1] += dirs[closest][1]*RECT_W/factor
+        end_point[0] += dirs[closest][0]*RECT_W/factor
+        end_point[1] += dirs[closest][1]*RECT_W/factor
     else:
         min_noise = np.sum(np.abs(curr_rect_px-last_rect_px))
 
