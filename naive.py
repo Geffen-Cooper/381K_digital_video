@@ -80,11 +80,11 @@ while True:
                 # print(start_point[1],dir[1]*RECT_W/2)
                 # print(start_point[1]+dir[1]*RECT_W/2,end_point[1]+dir[1]*RECT_W/2,start_point[0]+dir[0]*RECT_W/2,end_point[0]+dir[0]*RECT_W/2)
                 pred_px = img[start_point[1]+dir[1]*RECT_W//2:end_point[1]+dir[1]*RECT_W//2,start_point[0]+dir[0]*RECT_W//2:end_point[0]+dir[0]*RECT_W//2]
-                l1[i] = np.sum(np.abs(pred_px-last_rect_px))
+                l1[i] = np.sum(np.abs(pred_px.astype(int)-last_rect_px.astype(int)))
                 
                 cv2.imwrite("patch"+str(dir)+".png",pred_px)
-        for i,l in enumerate(sorted(l1)):
-            print(dirs[i],l)
+        for idx in np.argsort(l1):
+            print(dirs[idx],l1[idx])
         print("===")
         show_patches()
         closest = np.argmin(l1)
