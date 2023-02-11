@@ -3,6 +3,8 @@ import time
 import numpy as np
 import matplotlib.pyplot as plt
 
+DEBUG_MODE = False
+
 # init rect
 RECT_W = 100
 RECT_H = 100
@@ -81,12 +83,13 @@ while True:
                 # print(start_point[1]+dir[1]*RECT_W/2,end_point[1]+dir[1]*RECT_W/2,start_point[0]+dir[0]*RECT_W/2,end_point[0]+dir[0]*RECT_W/2)
                 pred_px = img[start_point[1]+dir[1]*RECT_W//2:end_point[1]+dir[1]*RECT_W//2,start_point[0]+dir[0]*RECT_W//2:end_point[0]+dir[0]*RECT_W//2]
                 l1[i] = np.sum(np.abs(pred_px.astype(int)-last_rect_px.astype(int)))
-                
-                cv2.imwrite("patch"+str(dir)+".png",pred_px)
-        for idx in np.argsort(l1):
-            print(dirs[idx],l1[idx])
-        print("===")
-        show_patches()
+                if DEBUG_MODE:
+                    cv2.imwrite("patch"+str(dir)+".png",pred_px)
+        if DEBUG_MODE:
+            for idx in np.argsort(l1):
+                print(dirs[idx],l1[idx])
+            print("===")
+            show_patches()
         closest = np.argmin(l1)
         print(dirs[closest])
         start_point[0] += dirs[closest][0]*RECT_W/2
