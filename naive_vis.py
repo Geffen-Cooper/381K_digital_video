@@ -11,7 +11,6 @@ RECT_H = 100
 # RECT_Vx = 10
 # RECT_Vy = 10
 factor = 10
-sx, sy = np.meshgrid(np.arange(-50,51),np.arange(-50,51))
 
 # initialize the capture object
 cap = cv2.VideoCapture(0)
@@ -35,6 +34,9 @@ center_brc_x = int(FRAME_W/2 + RECT_W/2)
 center_brc_y = int(FRAME_H/2 + RECT_H/2)
 start_point = np.array([center_tlc_x, center_tlc_y])
 end_point = np.array([center_brc_x, center_brc_y])
+
+# sx, sy = np.meshgrid(np.arange(-start_point[0],start_point[0]+1),np.arange(-start_point[1],start_point[1]+1))
+sx, sy = np.meshgrid(np.arange(-50,50+1),np.arange(-50,50+1))
 
 start_tracking = False
 
@@ -74,11 +76,21 @@ while True:
     # === Rectangle tracking update ===
     # update position
     if start_tracking:
-        l1 = np.zeros((sx.shape[1],sy.shape[0]))
+        l1 = np.zeros((sy.shape[0],sx.shape[1]))
+        print(l1.shape)
+        # get the rows of sx and sy
         for i,(xr,yr) in enumerate(zip(sx,sy)):
+            # get the columns of xr and yr
             for j,(xc,yc) in enumerate(zip(xr,yr)):
-                pred_px = img[start_point[1]+yc:end_point[1]+yc,start_point[0]+xc:end_point[0]+xc]
-                l1[i,j] = np.sum(np.abs(pred_px.astype(int)-last_rect_px.astype(int)))
+                try:
+                    pred_px = img[start_point[1]+yc:end_point[1]+yc,start_point[0]+xc:end_point[0]+xc]
+                    l1[i,j] = np.sum(np.abs(pred_px.astype(int)-last_rect_px.astype(int)))
+                except:
+                    print(start_point,end_point)
+                    print(i,j,xc,yc)
+                    print(pred_px.shape)
+                    print(last_rect_px.shape)
+                    exit()
         cv2.rectangle(img, start_point, end_point, (0,0,255), 4)
         cv2.imwrite("curr.png",img)
         cv2.imwrite("last.png",last_img)
@@ -88,11 +100,18 @@ while True:
         ax[0].set_yticks([0,50,100])
         ax[0].set_xticklabels([-50,0,50])
         ax[0].set_yticklabels([-50,0,50])
+        # bar = ax[0].imshow(l1,extent=[-50+320, 50+320, -50+240, 50+240])
+        # ax[0].set_xticks([0,320,640])
+        # ax[0].set_yticks([0,240,480])
+        # ax[0].set_xticklabels([-320,0,320])
+        # ax[0].set_yticklabels([-240,0,240])
         ax[0].grid()
         ax[1].imshow(cv2.cvtColor(last_img, cv2.COLOR_BGR2RGB))
+        ax[1].set_title("last frame")
         ax[2].imshow(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
+        ax[2].set_title("current frame")
         
-        plt.colorbar(bar)
+        # plt.colorbar(bar)
         plt.show()
         start_tracking = False
     
