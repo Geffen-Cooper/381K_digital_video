@@ -46,19 +46,6 @@ if not ret:
 img = cv2.flip(img,1)
 last_rect_px = img[start_point[1]:end_point[1],start_point[0]:end_point[0]]
 
-l1 = np.ones(9)*1e10
-dirs = np.array([[-1,-1],[0,-1],[1,-1],[-1,0],[0,0],[1,0],[-1,1],[0,1],[1,1]])
-
-def show_patches():
-    fig,axs = plt.subplot_mosaic([['last','[-1 -1]','[ 0 -1]','[ 1 -1]'],
-                                   ['last','[-1  0]','[0 0]','[1 0]'],
-                                   ['last','[-1  1]','[0 1]','[1 1]']],figsize=(6,6))
-    for dir in dirs:
-        img = cv2.imread("patch"+str(dir)+".png")
-        axs[str(dir)].imshow(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
-    img = cv2.imread("last.png")
-    axs['last'].imshow(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
-    plt.show()
 
 sx, sy = np.meshgrid(np.arange(-15,15+1),np.arange(-15,15+1))
 
@@ -77,12 +64,15 @@ while True:
     # update position
     if start_tracking:
         # l1 = np.ones(9)*1e9
-        l1 = np.zeros((sy.shape[0],sx.shape[1]))
+        l1 = np.ones((sy.shape[0],sx.shape[1]))*1e9
         for i,(xr,yr) in enumerate(zip(sx,sy)):
             # get the columns of xr and yr
             for j,(xc,yc) in enumerate(zip(xr,yr)):
-                pred_px = img[start_point[1]+yc:end_point[1]+yc,start_point[0]+xc:end_point[0]+xc]
-                l1[i,j] = np.sum(np.abs(pred_px.astype(int)-last_rect_px.astype(int)))
+                if start_point[1]+yc <= 0 or end_point[1]+yc >= FRAME_H or start_point[0]+xc <= 0 or end_point[0]+xc >= FRAME_W:
+                    print("Hitting Boundary")
+                else:
+                    pred_px = img[start_point[1]+yc:end_point[1]+yc,start_point[0]+xc:end_point[0]+xc]
+                    l1[i,j] = np.sum(np.abs(pred_px.astype(int)-last_rect_px.astype(int)))
                 # # get the adjacent pixels absolute difference with last square
                 # if start_point[1]+dir[1]*RECT_W/factor <= 0 or end_point[1]+dir[1]*RECT_W/factor >= FRAME_H or start_point[0]+dir[0]*RECT_W/factor <= 0 or end_point[0]+dir[0]*RECT_W/factor >= FRAME_W:
                 #     print("BAD")

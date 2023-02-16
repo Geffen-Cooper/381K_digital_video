@@ -11,7 +11,7 @@ RECT_W = 100
 RECT_H = 100
 # RECT_Vx = 10
 # RECT_Vy = 10
-factor = 10
+SEARCH_SIZE = 150
 
 # initialize the capture object
 cap = cv2.VideoCapture(0)
@@ -37,7 +37,7 @@ start_point = np.array([center_tlc_x, center_tlc_y])
 end_point = np.array([center_brc_x, center_brc_y])
 
 # sx, sy = np.meshgrid(np.arange(-start_point[0],start_point[0]+1),np.arange(-start_point[1],start_point[1]+1))
-sx, sy = np.meshgrid(np.arange(-50,50+1),np.arange(-50,50+1))
+sx, sy = np.meshgrid(np.arange(-SEARCH_SIZE,SEARCH_SIZE+1),np.arange(-SEARCH_SIZE,SEARCH_SIZE+1))
 
 start_tracking = False
 
@@ -94,7 +94,7 @@ while True:
                     print(last_rect_px.shape)
                     exit()
         overlay = img.copy()
-        cv2.rectangle(overlay, start_point-50, end_point+50, (0,0,255), -1)
+        cv2.rectangle(overlay, start_point-SEARCH_SIZE, end_point+SEARCH_SIZE, (0,0,255), -1)
         img = cv2.addWeighted(overlay, 0.2, img, 1 - 0.2, 0)
         cv2.rectangle(img, start_point, end_point, (0,0,255), 4)
         cv2.circle(img, (start_point[0]+50,start_point[1]+50), radius=6, color=(0, 0, 255), thickness=-1)
@@ -103,10 +103,10 @@ while True:
         cv2.imwrite("last.png",last_img)
         
         closest = np.argmin(l1)
-        col = (closest % 101)
-        row = (closest // 101)
-        y_rel = row-50
-        x_rel = col-50
+        col = (closest % (SEARCH_SIZE+SEARCH_SIZE+1))
+        row = (closest // (SEARCH_SIZE+SEARCH_SIZE+1))
+        y_rel = row-SEARCH_SIZE
+        x_rel = col-SEARCH_SIZE
         # print(row,col,x_rel,y_rel,closest)
         cv2.rectangle(img, (start_point[0]+x_rel,start_point[1]+y_rel), (end_point[0]+x_rel,end_point[1]+y_rel), (0,255,0), 4)
         cv2.circle(img, (start_point[0]+50+x_rel,start_point[1]+50+y_rel), radius=6, color=(0, 255, 0), thickness=-1)
@@ -114,8 +114,10 @@ while True:
         ax3d = fig.add_subplot(1, 3, 1, projection='3d')
         ax3d.scatter(x_rel,-y_rel,np.min(l1),c='r')
         ax3d.set_title("relative delta: ("+str(x_rel)+","+str(y_rel)+")")
-        ax3d.set_yticks([-50,-25,0,25,50])
-        ax3d.set_yticklabels(['50','25','0','-25','-50'])
+        ax3d.set_yticks([-SEARCH_SIZE,-SEARCH_SIZE/2,0,SEARCH_SIZE/2,SEARCH_SIZE])
+        ax3d.set_yticklabels([str(SEARCH_SIZE),str(SEARCH_SIZE/2),'0',str(-SEARCH_SIZE/2),str(-SEARCH_SIZE)])
+        ax3d.set_xticks([-SEARCH_SIZE,-SEARCH_SIZE/2,0,SEARCH_SIZE/2,SEARCH_SIZE])
+        ax3d.set_xticklabels([str(SEARCH_SIZE),str(SEARCH_SIZE/2),'0',str(-SEARCH_SIZE/2),str(-SEARCH_SIZE)])
         ax_before = fig.add_subplot(1,3,2)
         ax_after = fig.add_subplot(1,3,3)
         ax3d.plot_surface(sx,-sy,l1, cmap=cm.coolwarm)
@@ -125,10 +127,10 @@ while True:
         ax_before.set_title("last frame")
         ax_after.imshow(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
         ax_after.set_title("current frame")
-        ax_after.text(FRAME_W//2-100-40,FRAME_H//2-100,"(-50,-50)",c='w',size=5)
-        ax_after.text(FRAME_W//2+100-40,FRAME_H//2-100,"(50,-50)",c='w',size=5)
-        ax_after.text(FRAME_W//2-100-40,FRAME_H//2+100,"(-50,50)",c='w',size=5)
-        ax_after.text(FRAME_W//2+100-40,FRAME_H//2+100,"(50,50)",c='w',size=5)
+        ax_after.text(FRAME_W//2-(SEARCH_SIZE+RECT_W//2)-40,FRAME_H//2-(SEARCH_SIZE+RECT_H//2),"("+str(-SEARCH_SIZE)+","+str(-SEARCH_SIZE)+")",c='w',size=5)
+        ax_after.text(FRAME_W//2+(SEARCH_SIZE+RECT_W//2)-40,FRAME_H//2-(SEARCH_SIZE+RECT_H//2),"("+str(SEARCH_SIZE)+","+str(-SEARCH_SIZE)+")",c='w',size=5)
+        ax_after.text(FRAME_W//2-(SEARCH_SIZE+RECT_W//2)-40,FRAME_H//2+(SEARCH_SIZE+RECT_H//2),"("+str(-SEARCH_SIZE)+","+str(SEARCH_SIZE)+")",c='w',size=5)
+        ax_after.text(FRAME_W//2+(SEARCH_SIZE+RECT_W//2)-40,FRAME_H//2+(SEARCH_SIZE+RECT_H//2),"("+str(SEARCH_SIZE)+","+str(SEARCH_SIZE)+")",c='w',size=5)
         offset = 0
         if x_rel < 0:
             offset += 7
@@ -144,7 +146,7 @@ while True:
     last_img = img
     
     cv2.rectangle(img, start_point, end_point, (0,0,255), 4)
-    cv2.circle(img, (start_point[0]+50,start_point[1]+50), radius=6, color=(0, 0, 255), thickness=-1)
+    cv2.circle(img, (start_point[0]+RECT_W//2,start_point[1]+RECT_H//2), radius=6, color=(0, 0, 255), thickness=-1)
   
     # # calculate the fps
     # frame_count += 1
