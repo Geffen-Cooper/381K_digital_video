@@ -121,21 +121,20 @@ while True:
         ax3d.plot_surface(sx,-sy,l1, cmap=cm.coolwarm)
         ax3d.set_xlabel("x - horizontal")
         ax3d.set_ylabel("y - vertical")
-        # bar = ax[0].imshow(l1)
-        # ax[0].set_xticks([0,50,100])
-        # ax[0].set_yticks([0,50,100])
-        # ax[0].set_xticklabels([-50,0,50])
-        # ax[0].set_yticklabels([-50,0,50])
-        # bar = ax[0].imshow(l1,extent=[-50+320, 50+320, -50+240, 50+240])
-        # ax[0].set_xticks([0,320,640])
-        # ax[0].set_yticks([0,240,480])
-        # ax[0].set_xticklabels([-320,0,320])
-        # ax[0].set_yticklabels([-240,0,240])
-        # ax[0].grid()
         ax_before.imshow(cv2.cvtColor(last_img, cv2.COLOR_BGR2RGB))
         ax_before.set_title("last frame")
         ax_after.imshow(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
         ax_after.set_title("current frame")
+        ax_after.text(FRAME_W//2-100-40,FRAME_H//2-100,"(-50,-50)",c='w',size=5)
+        ax_after.text(FRAME_W//2+100-40,FRAME_H//2-100,"(50,-50)",c='w',size=5)
+        ax_after.text(FRAME_W//2-100-40,FRAME_H//2+100,"(-50,50)",c='w',size=5)
+        ax_after.text(FRAME_W//2+100-40,FRAME_H//2+100,"(50,50)",c='w',size=5)
+        offset = 0
+        if x_rel < 0:
+            offset += 7
+        if y_rel < 0:
+            offset += 7
+        ax_after.text(FRAME_W//2-25-offset+x_rel,FRAME_H//2-15+y_rel,"("+str(x_rel)+","+str(y_rel)+")",c=(0,1,0),size=5)
         
         # plt.colorbar(bar)
         start_tracking = False
