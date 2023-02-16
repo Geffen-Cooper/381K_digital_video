@@ -2,6 +2,7 @@ import cv2
 import time
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib import cm
 
 DEBUG_MODE = False
 
@@ -63,6 +64,7 @@ def show_patches():
     axs['last'].imshow(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
     plt.show()
 
+
 # start loop
 while True:
     # try to read a frame
@@ -77,7 +79,7 @@ while True:
     # update position
     if start_tracking:
         l1 = np.zeros((sy.shape[0],sx.shape[1]))
-        print(l1.shape)
+        # print(l1.shape)
         # get the rows of sx and sy
         for i,(xr,yr) in enumerate(zip(sx,sy)):
             # get the columns of xr and yr
@@ -91,34 +93,59 @@ while True:
                     print(pred_px.shape)
                     print(last_rect_px.shape)
                     exit()
+        overlay = img.copy()
+        cv2.rectangle(overlay, start_point-50, end_point+50, (0,0,255), -1)
+        img = cv2.addWeighted(overlay, 0.2, img, 1 - 0.2, 0)
         cv2.rectangle(img, start_point, end_point, (0,0,255), 4)
+        cv2.circle(img, (start_point[0]+50,start_point[1]+50), radius=6, color=(0, 0, 255), thickness=-1)
+        
         cv2.imwrite("curr.png",img)
         cv2.imwrite("last.png",last_img)
-        fig,ax = plt.subplots(1,3)
-        bar = ax[0].imshow(l1)
-        ax[0].set_xticks([0,50,100])
-        ax[0].set_yticks([0,50,100])
-        ax[0].set_xticklabels([-50,0,50])
-        ax[0].set_yticklabels([-50,0,50])
+        
+        closest = np.argmin(l1)
+        col = (closest % 101)
+        row = (closest // 101)
+        y_rel = row-50
+        x_rel = col-50
+        # print(row,col,x_rel,y_rel,closest)
+        cv2.rectangle(img, (start_point[0]+x_rel,start_point[1]+y_rel), (end_point[0]+x_rel,end_point[1]+y_rel), (0,255,0), 4)
+        cv2.circle(img, (start_point[0]+50+x_rel,start_point[1]+50+y_rel), radius=6, color=(0, 255, 0), thickness=-1)
+        fig = plt.figure(figsize=(10,4))
+        ax3d = fig.add_subplot(1, 3, 1, projection='3d')
+        ax3d.scatter(x_rel,-y_rel,np.min(l1),c='r')
+        ax3d.set_title("relative delta: ("+str(x_rel)+","+str(y_rel)+")")
+        ax3d.set_yticks([-50,-25,0,25,50])
+        ax3d.set_yticklabels(['50','25','0','-25','-50'])
+        ax_before = fig.add_subplot(1,3,2)
+        ax_after = fig.add_subplot(1,3,3)
+        ax3d.plot_surface(sx,-sy,l1, cmap=cm.coolwarm)
+        ax3d.set_xlabel("x - horizontal")
+        ax3d.set_ylabel("y - vertical")
+        # bar = ax[0].imshow(l1)
+        # ax[0].set_xticks([0,50,100])
+        # ax[0].set_yticks([0,50,100])
+        # ax[0].set_xticklabels([-50,0,50])
+        # ax[0].set_yticklabels([-50,0,50])
         # bar = ax[0].imshow(l1,extent=[-50+320, 50+320, -50+240, 50+240])
         # ax[0].set_xticks([0,320,640])
         # ax[0].set_yticks([0,240,480])
         # ax[0].set_xticklabels([-320,0,320])
         # ax[0].set_yticklabels([-240,0,240])
-        ax[0].grid()
-        ax[1].imshow(cv2.cvtColor(last_img, cv2.COLOR_BGR2RGB))
-        ax[1].set_title("last frame")
-        ax[2].imshow(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
-        ax[2].set_title("current frame")
+        # ax[0].grid()
+        ax_before.imshow(cv2.cvtColor(last_img, cv2.COLOR_BGR2RGB))
+        ax_before.set_title("last frame")
+        ax_after.imshow(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
+        ax_after.set_title("current frame")
         
         # plt.colorbar(bar)
-        plt.show()
         start_tracking = False
+        fig.show()
     
     last_rect_px = img[start_point[1]:end_point[1],start_point[0]:end_point[0]]
     last_img = img
     
     cv2.rectangle(img, start_point, end_point, (0,0,255), 4)
+    cv2.circle(img, (start_point[0]+50,start_point[1]+50), radius=6, color=(0, 0, 255), thickness=-1)
   
     # # calculate the fps
     # frame_count += 1
