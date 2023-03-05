@@ -151,8 +151,12 @@ class VideoPairs(Dataset):
     def __getitem__(self, idx):
         # map the idx into a 3D coordinate (x,y,video number)
         video_number = idx // (self.vid_h*self.vid_w)
-        x_coord = (idx - video_number*(self.vid_h*self.vid_w)) % self.vid_w
-        y_coord = (idx - video_number*(self.vid_h*self.vid_w)) // self.vid_w
+        x_coord = (idx - video_number*(self.vid_h*self.vid_w)) % self.patch_coords_x.shape[1]
+        y_coord = (idx - video_number*(self.vid_h*self.vid_w)) // self.patch_coords_x.shape[1]
+
+        # print(video_number,x_coord,y_coord)
+        # print(self.patch_coords_x)
+        # print(self.patch_coords_y)
 
         # scale to pixel coordinates
         x_coord = self.patch_coords_x[0,x_coord]
@@ -168,7 +172,7 @@ class VideoPairs(Dataset):
         return self.patch_coords_x.shape[0]*self.patch_coords_x.shape[1]*self.num_videos
 
     def visualize_sample(self):
-        comp,gt = self.__getitem__(0)
+        comp,gt = self.__getitem__(7)
         out_comp = cv2.VideoWriter('out_comp.avi',cv2.VideoWriter_fourcc('M','J','P','G'), 30, (224,224))
         out_gt = cv2.VideoWriter('out_gt.avi',cv2.VideoWriter_fourcc('M','J','P','G'), 30, (224,224))
 
@@ -202,4 +206,5 @@ class VideoPairs(Dataset):
                 # break 
 
 vd = VideoPairs("C:\\Users\\geffen\\Documents\\Programming\\381K_digital_video\\HW2",224,0.5,None,training=True)
+print(len(vd))
 vd.visualize_sample()
