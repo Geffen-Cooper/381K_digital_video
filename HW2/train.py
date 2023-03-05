@@ -16,13 +16,13 @@ import time
 from datasets import *
 from models import *
 
-def train(model,train_loader,val_loader,device,loss_fn,args):
+def train(model,train_loader,val_loader,device,loss_fn,optimizer,args):
     
     # init tensorboard
     writer = SummaryWriter()
 
     # create the optimizer
-    optimizer = torch.optim.SGD(model.parameters(), lr=args.lr)#,weight_decay=0.00004,momentum=0.9)
+    #optimizer = torch.optim.SGD(model.parameters(), lr=args.lr)#,weight_decay=0.00004,momentum=0.9)
     # # scheduler1 = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[5,10,20], gamma=0.2)
     # scheduler2 = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.5)
     # scheduler1 = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.99)
@@ -110,19 +110,22 @@ def parse_args():
                         help='disables CUDA training')
     parser.add_argument('--seed', type=int, default=1, metavar='S',
                         help='random seed (default: 1)')
-    parser.add_argument('--log-interval', type=int, default=300, metavar='N',
+    parser.add_argument('--log-interval', type=int, default=1, metavar='N',
                         help='how many batches to wait before logging training status')
 
 
     args = parser.parse_args()
     print(args)
+    
     return args
-
+    
 # ===================================== Main =====================================
 if __name__ == "__main__":
     print("=================")
+    # get arguments
     args = parse_args()
 
+    # setup device
     use_cuda = not args.no_cuda and torch.cuda.is_available()
     if use_cuda:
         device = torch.device("cuda")
@@ -132,7 +135,13 @@ if __name__ == "__main__":
     torch.manual_seed(args.seed)
     args.device = device
 
-    train_loader = load_video_pairs(args.batch_size,args.seed)
+    # load datasets
+    train_loader, val_loader, test_loader = load_video_pairs(args.batch_size,args.seed)
+
+    # load the model
+    model = ArtifactReduction()
+
+    # set loss function
     if args.loss == "L1":
         loss = torch.nn.L1Loss()
     elif args.loss == "L2":
@@ -141,4 +150,11 @@ if __name__ == "__main__":
         loss = torch.nn.HuberLoss()
     elif args.loss == "SSIM":
         pass
-    train(args)
+
+    # set optimizer
+    if args.opt == "SGD":
+        opt = torch.optim.SGD(params=model.parameters(),lr=args.lr)
+    elif args.opt == "Adam":
+        opt = torch.optim.Adam(params=model.parameters(),lr=args.lr)
+
+    train(model,train_loader,val_loader,device,loss,opt,args)

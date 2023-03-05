@@ -118,7 +118,7 @@ class VideoPairs(Dataset):
         elif validation:
             self.sub_dir = "validation"
         elif testing:
-            self.sub_dir = "testing"
+            self.sub_dir = "test"
 
         self.video_path = os.path.join(self.root_dir,self.sub_dir)
 
@@ -135,7 +135,7 @@ class VideoPairs(Dataset):
         else:
             # store files for each subfolder
             subfolders = os.listdir(os.path.join(self.video_path,"compressed"))
-            subfolders = sorted(subfolders,key=lambda x: int(os.path.splitext(x)[0]))
+            # subfolders = sorted(subfolders,key=lambda x: int(os.path.splitext(x)[0]))
 
             self.comp_video_files = [[] for i in range(len(subfolders))]
             self.gt_video_files = [[] for i in range(len(subfolders))]
@@ -163,6 +163,7 @@ class VideoPairs(Dataset):
         overlap_px = int(self.patch_size*overlap_ratio)
         num_patches_horizontal = (self.vid_w - patch_size) // overlap_px
         num_patches_vertical = (self.vid_h - patch_size) // overlap_px
+        
 
         # patch doesn't fit evenly
         if (self.vid_w - patch_size) % overlap_px != 0:
@@ -181,13 +182,13 @@ class VideoPairs(Dataset):
 
     def __getitem__(self, idx):
         # map the idx into a 3D coordinate (x,y,video number)
-        video_number = idx // (self.vid_h*self.vid_w)
-        x_coord = (idx - video_number*(self.vid_h*self.vid_w)) % self.patch_coords_x.shape[1]
-        y_coord = (idx - video_number*(self.vid_h*self.vid_w)) // self.patch_coords_x.shape[1]
-
-        # print(video_number,x_coord,y_coord)
-        # print(self.patch_coords_x)
-        # print(self.patch_coords_y)
+        w,h = self.patch_coords_x.shape[1], self.patch_coords_x.shape[0]
+        video_number = idx // (w*h)
+    
+        x_coord = (idx - video_number*(w*h)) % w
+        y_coord = (idx - video_number*(w*h)) // w
+        print(video_number)
+        print(self.comp_video_files[video_number][0])
 
         # scale to pixel coordinates
         x_coord = self.patch_coords_x[0,x_coord]
@@ -207,7 +208,7 @@ class VideoPairs(Dataset):
         return self.patch_coords_x.shape[0]*self.patch_coords_x.shape[1]*self.num_videos
 
     def visualize_sample(self):
-        comp,gt = self.__getitem__(12)
+        comp,gt = self.__getitem__(700)
         comp = torch.permute(comp,(1,2,3,0)).numpy().astype(np.uint8)
         gt = torch.permute(gt,(1,2,3,0)).numpy().astype(np.uint8)
 
@@ -246,17 +247,19 @@ class VideoPairs(Dataset):
 
 
 def load_video_pairs(batch_size,rand_seed):
-    root_dir = "C:\\Users\\geffen\\Documents\\Programming\\381K_digital_video\\HW2"
+    root_dir = "/home/gc28692/Projects/381K_digital_video/HW2"
 
-    # vd_train = VideoPairs(root_dir,True,224,0.5,None,training=True)
-    # vd_val = VideoPairs(root_dir,True,224,0.5,None,validation=True)
-    vd_test = VideoPairs(root_dir,True,224,0.5,None,testing=True)
+    vd_train = VideoPairs(root_dir,True,224,0.5,None,training=True,validation=False,testing=False)
+    vd_val = VideoPairs(root_dir,True,224,0.5,None,training=False,validation=True,testing=False)
+    vd_test = VideoPairs(root_dir,True,224,0.5,None,training=False,validation=False,testing=True)
 
     # create the data loaders
-    # train_loader = torch.utils.data.DataLoader(vd_train, batch_size=batch_size, shuffle=True, pin_memory=True,num_workers=4,generator=g_cpu)
-    # val_loader = torch.utils.data.DataLoader(vd_val, batch_size=batch_size, shuffle=True, pin_memory=True,num_workers=4,generator=g_cpu)
+    train_loader = torch.utils.data.DataLoader(vd_train, batch_size=batch_size, shuffle=True, pin_memory=True,num_workers=4)
+    val_loader = torch.utils.data.DataLoader(vd_val, batch_size=batch_size, shuffle=True, pin_memory=True,num_workers=4)
     test_loader = torch.utils.data.DataLoader(vd_test, batch_size=batch_size, shuffle=True, pin_memory=True,num_workers=4)
-    return test_loader
-    # return (train_loader, val_loader, test_loader)
-# print(len(vd))
-# vd.visualize_sample()
+    # return test_loader
+    return (train_loader, val_loader, test_loader)
+
+vd = VideoPairs("/home/gc28692/Projects/data/video_pairs",True,training=False,testing=True)
+print("num crop samples",len(vd))
+vd.visualize_sample()
