@@ -11,7 +11,7 @@ RECT_W = 100
 RECT_H = 100
 # RECT_Vx = 10
 # RECT_Vy = 10
-SEARCH_SIZE = 150
+SEARCH_SIZE = 50
 
 # initialize the capture object
 cap = cv2.VideoCapture(0)
@@ -74,11 +74,13 @@ while True:
 
     # flip horizontally
     img = cv2.flip(img,1)
+    # imgb = cv2.GaussianBlur(img,(7,7),2,2)
 
     # === Rectangle tracking update ===
     # update position
     if start_tracking:
         l1 = np.zeros((sy.shape[0],sx.shape[1]))
+        # l1b = np.zeros((sy.shape[0],sx.shape[1]))
         # print(l1.shape)
         # get the rows of sx and sy
         for i,(xr,yr) in enumerate(zip(sx,sy)):
@@ -86,7 +88,9 @@ while True:
             for j,(xc,yc) in enumerate(zip(xr,yr)):
                 try:
                     pred_px = img[start_point[1]+yc:end_point[1]+yc,start_point[0]+xc:end_point[0]+xc]
+                    # pred_pxb = imgb[start_point[1]+yc:end_point[1]+yc,start_point[0]+xc:end_point[0]+xc]
                     l1[i,j] = np.sum(np.abs(pred_px.astype(int)-last_rect_px.astype(int)))
+                    # l1b[i,j] = np.sum(np.abs(pred_pxb.astype(int)-last_rect_px.astype(int)))
                 except:
                     print(start_point,end_point)
                     print(i,j,xc,yc)
@@ -112,15 +116,19 @@ while True:
         cv2.circle(img, (start_point[0]+50+x_rel,start_point[1]+50+y_rel), radius=6, color=(0, 255, 0), thickness=-1)
         fig = plt.figure(figsize=(10,4))
         ax3d = fig.add_subplot(1, 3, 1, projection='3d')
+        # ax3db = fig.add_subplot(1, 4, 2, projection='3d')
         ax3d.scatter(x_rel,-y_rel,np.min(l1),c='r')
         ax3d.set_title("relative delta: ("+str(x_rel)+","+str(y_rel)+")")
         ax3d.set_yticks([-SEARCH_SIZE,-SEARCH_SIZE/2,0,SEARCH_SIZE/2,SEARCH_SIZE])
         ax3d.set_yticklabels([str(SEARCH_SIZE),str(SEARCH_SIZE/2),'0',str(-SEARCH_SIZE/2),str(-SEARCH_SIZE)])
         ax3d.set_xticks([-SEARCH_SIZE,-SEARCH_SIZE/2,0,SEARCH_SIZE/2,SEARCH_SIZE])
         ax3d.set_xticklabels([str(SEARCH_SIZE),str(SEARCH_SIZE/2),'0',str(-SEARCH_SIZE/2),str(-SEARCH_SIZE)])
+        # ax3db.set_zlim([0,1.5e6])
+        ax3d.set_zlim([0,1.5e6])
         ax_before = fig.add_subplot(1,3,2)
         ax_after = fig.add_subplot(1,3,3)
         ax3d.plot_surface(sx,-sy,l1, cmap=cm.coolwarm)
+        # ax3db.plot_surface(sx,-sy,l1b, cmap=cm.coolwarm)
         ax3d.set_xlabel("x - horizontal")
         ax3d.set_ylabel("y - vertical")
         ax_before.imshow(cv2.cvtColor(last_img, cv2.COLOR_BGR2RGB))
@@ -140,10 +148,15 @@ while True:
         
         # plt.colorbar(bar)
         start_tracking = False
+        # print(l1[:5,:5])
+        # print(l1b[:5,:5])
         fig.show()
     
+    last_imgb = cv2.GaussianBlur(img,(7,7),0.5,0.5)
     last_rect_px = img[start_point[1]:end_point[1],start_point[0]:end_point[0]]
+    last_rect_pxb = last_imgb[start_point[1]:end_point[1],start_point[0]:end_point[0]]
     last_img = img
+    cv2.imwrite("last_rec.png",last_rect_px)
     
     cv2.rectangle(img, start_point, end_point, (0,0,255), 4)
     cv2.circle(img, (start_point[0]+RECT_W//2,start_point[1]+RECT_H//2), radius=6, color=(0, 0, 255), thickness=-1)

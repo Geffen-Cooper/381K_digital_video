@@ -46,9 +46,11 @@ if not ret:
 img = cv2.flip(img,1)
 last_rect_px = img[start_point[1]:end_point[1],start_point[0]:end_point[0]]
 
+SEARCH_SIZE = 25
+sx, sy = np.meshgrid(np.arange(-SEARCH_SIZE,SEARCH_SIZE+1),np.arange(-SEARCH_SIZE,SEARCH_SIZE+1))
 
-sx, sy = np.meshgrid(np.arange(-15,15+1),np.arange(-15,15+1))
-
+x_rel = 0
+y_rel = 0
 # start loop
 while True:
     # try to read a frame
@@ -59,20 +61,32 @@ while True:
     # flip horizontally
     img = cv2.flip(img,1)
     curr_rect_px = img[start_point[1]:end_point[1],start_point[0]:end_point[0]]
-
+    
     # === Rectangle tracking update ===
     # update position
+    first_frame = True
     if start_tracking:
+        if first_frame == True:
+            first_frame = False
+            first_frame = last_rect_px
         # l1 = np.ones(9)*1e9
         l1 = np.ones((sy.shape[0],sx.shape[1]))*1e9
+        count = 0
         for i,(xr,yr) in enumerate(zip(sx,sy)):
+            if not i % 2:
+                continue
             # get the columns of xr and yr
             for j,(xc,yc) in enumerate(zip(xr,yr)):
-                if start_point[1]+yc <= 0 or end_point[1]+yc >= FRAME_H or start_point[0]+xc <= 0 or end_point[0]+xc >= FRAME_W:
-                    print("Hitting Boundary")
-                else:
-                    pred_px = img[start_point[1]+yc:end_point[1]+yc,start_point[0]+xc:end_point[0]+xc]
-                    l1[i,j] = np.sum(np.abs(pred_px.astype(int)-last_rect_px.astype(int)))
+                if not j % 2:
+                    continue
+                # only search in same direction
+                if True:#np.array([xc,yc]).T@np.array([x_rel,y_rel]) >= 0:
+                    count += 1
+                    if start_point[1]+yc <= 0 or end_point[1]+yc >= FRAME_H or start_point[0]+xc <= 0 or end_point[0]+xc >= FRAME_W:
+                        print("Hitting Boundary")
+                    else:
+                        pred_px = img[start_point[1]+yc:end_point[1]+yc,start_point[0]+xc:end_point[0]+xc]
+                        l1[i,j] = np.sum(np.abs(pred_px.astype(int)-last_rect_px.astype(int)))
                 # # get the adjacent pixels absolute difference with last square
                 # if start_point[1]+dir[1]*RECT_W/factor <= 0 or end_point[1]+dir[1]*RECT_W/factor >= FRAME_H or start_point[0]+dir[0]*RECT_W/factor <= 0 or end_point[0]+dir[0]*RECT_W/factor >= FRAME_W:
                 #     print("BAD")
@@ -83,20 +97,19 @@ while True:
                 #     l1[i] = np.sum(np.abs(pred_px.astype(int)-last_rect_px.astype(int)))
                 #     if DEBUG_MODE:
                 #         cv2.imwrite("patch"+str(dir)+".png",pred_px)
-        if DEBUG_MODE:
-            for idx in np.argsort(l1):
-                print(dirs[idx],l1[idx])
-            print("===")
-            show_patches()
-        closest = np.argmin(l1)
-        row = closest % 31
-        col = closest //31
-        # print(row,col)
-        # print(dirs[closest])
-        start_point[0] += row-15#dirs[closest][0]*RECT_W/factor
-        start_point[1] += col-15#dirs[closest][1]*RECT_W/factor
-        end_point[0] += row-15#dirs[closest][0]*RECT_W/factor
-        end_point[1] += col-15#dirs[closest][1]*RECT_W/factor
+        
+        if np.min(l1) > 50000:
+            closest = np.argmin(l1)
+            col = (closest % (SEARCH_SIZE+SEARCH_SIZE+1))
+            row = (closest // (SEARCH_SIZE+SEARCH_SIZE+1))
+            y_rel = row-SEARCH_SIZE
+            x_rel = col-SEARCH_SIZE
+            # print(row,col)
+            # print(dirs[closest])
+            start_point[0] += x_rel#dirs[closest][0]*RECT_W/factor
+            start_point[1] += y_rel#dirs[closest][1]*RECT_W/factor
+            end_point[0] += x_rel#dirs[closest][0]*RECT_W/factor
+            end_point[1] += y_rel#dirs[closest][1]*RECT_W/factor
     else:
         min_noise = np.sum(np.abs(curr_rect_px-last_rect_px))
 
@@ -119,8 +132,14 @@ while True:
         start_point[1] = FRAME_H - RECT_H
    
     last_rect_px = img[start_point[1]:end_point[1],start_point[0]:end_point[0]]
-    cv2.imwrite("last.png",last_rect_px)
-    cv2.rectangle(img, start_point, end_point, (0,0,255), 4)
+    # cv2.imwrite("last.png",last_rect_px)
+    
+    overlay = img.copy()
+    cv2.rectangle(overlay, start_point-SEARCH_SIZE, end_point+SEARCH_SIZE, (0,0,255), -1)
+    img = cv2.addWeighted(overlay, 0.2, img, 1 - 0.2, 0)
+    cv2.putText(img,str(x_rel)+","+str(y_rel),start_point-10,font, 1, (100, 255, 0), 1, cv2.LINE_AA)
+    cv2.rectangle(img, (start_point[0],start_point[1]), end_point, (0,0,255), 4)
+    cv2.arrowedLine(img, (start_point[0]-x_rel,start_point[1]-y_rel), start_point,(100, 255, 0), 3)
   
     # calculate the fps
     frame_count += 1

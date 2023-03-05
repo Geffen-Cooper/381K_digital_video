@@ -89,6 +89,8 @@ def get_video_frames(video_path,is_img_frames,patch_size=None,patch_coord=None,n
             frame_count += 1
         return frames
 
+
+
 class VideoPairs(Dataset):
     """Video Pairs Dataset.
     """
@@ -195,13 +197,20 @@ class VideoPairs(Dataset):
         compressed = get_video_frames(self.comp_video_files[video_number],self.img_frames,(self.patch_size,self.patch_size),(x_coord,y_coord))
         ground_truth = get_video_frames(self.gt_video_files[video_number],self.img_frames,(self.patch_size,self.patch_size),(x_coord,y_coord)) 
         
+        # now apply transforms, convert to tensor and permute dimensions
+        compressed = torch.permute(torch.tensor(compressed),(3,0,1,2))
+        ground_truth = torch.permute(torch.tensor(ground_truth),(3,0,1,2))
+
         return compressed, ground_truth
 
     def __len__(self):
         return self.patch_coords_x.shape[0]*self.patch_coords_x.shape[1]*self.num_videos
 
     def visualize_sample(self):
-        comp,gt = self.__getitem__(30)
+        comp,gt = self.__getitem__(12)
+        comp = torch.permute(comp,(1,2,3,0)).numpy().astype(np.uint8)
+        gt = torch.permute(gt,(1,2,3,0)).numpy().astype(np.uint8)
+
         print(comp.shape,gt.shape)
         out_comp = cv2.VideoWriter('out_comp.avi',cv2.VideoWriter_fourcc('M','J','P','G'), 30, (224,224))
         out_gt = cv2.VideoWriter('out_gt.avi',cv2.VideoWriter_fourcc('M','J','P','G'), 30, (224,224))
@@ -235,6 +244,19 @@ class VideoPairs(Dataset):
                 cap_gt.set(cv2.CAP_PROP_POS_FRAMES, 0)
                 # break 
 
-vd = VideoPairs("C:\\Users\\geffen\\Documents\\Programming\\381K_digital_video\\HW2",True,224,0.5,None,training=False,testing=True)
-print(len(vd))
-vd.visualize_sample()
+
+def load_video_pairs(batch_size,rand_seed):
+    root_dir = "C:\\Users\\geffen\\Documents\\Programming\\381K_digital_video\\HW2"
+
+    # vd_train = VideoPairs(root_dir,True,224,0.5,None,training=True)
+    # vd_val = VideoPairs(root_dir,True,224,0.5,None,validation=True)
+    vd_test = VideoPairs(root_dir,True,224,0.5,None,testing=True)
+
+    # create the data loaders
+    # train_loader = torch.utils.data.DataLoader(vd_train, batch_size=batch_size, shuffle=True, pin_memory=True,num_workers=4,generator=g_cpu)
+    # val_loader = torch.utils.data.DataLoader(vd_val, batch_size=batch_size, shuffle=True, pin_memory=True,num_workers=4,generator=g_cpu)
+    test_loader = torch.utils.data.DataLoader(vd_test, batch_size=batch_size, shuffle=True, pin_memory=True,num_workers=4)
+    return test_loader
+    # return (train_loader, val_loader, test_loader)
+# print(len(vd))
+# vd.visualize_sample()
