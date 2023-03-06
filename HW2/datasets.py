@@ -100,7 +100,7 @@ class VideoPairs(Dataset):
         Args:
             root_dir (string): directory where the training/validation/test splits are
             img_frames (bool): videos are stored as individual frames rather than a video file
-            patch_size (int): the crop dimension to use
+            patch_size (tuple): (w,h) the crop dimension to use
             overlap_ratio (float): the amount of overlap between crops
             transform (callable, optional): transform to be applied on a sample
             training (bool): specify if to load the training data
@@ -159,22 +159,23 @@ class VideoPairs(Dataset):
         self.vid_h, self.vid_w = first_frame.shape[:2]
 
         # now get the coordinates of each patch using the given overlap ratio
-        overlap_px = int(self.patch_size*overlap_ratio)
-        num_patches_horizontal = (self.vid_w - patch_size) // (patch_size-overlap_px)
-        num_patches_vertical = (self.vid_h - patch_size) // (patch_size-overlap_px)
+        x_overlap_px = int(self.patch_size[0]*overlap_ratio)
+        num_patches_horizontal = (self.vid_w - patch_size[0]) // (patch_size[0]-x_overlap_px)
+        y_overlap_px = int(self.patch_size[1]*overlap_ratio)
+        num_patches_vertical = (self.vid_h - patch_size[1]) // (patch_size[1]-y_overlap_px)
         
 
         # patch doesn't fit evenly
-        if (self.vid_w - patch_size) % (patch_size-overlap_px) != 0:
+        if (self.vid_w - patch_size[0]) % (patch_size[0]-x_overlap_px) != 0:
             num_patches_horizontal += 1
-            x_coords = np.concatenate([np.arange(0,self.vid_w-patch_size,(patch_size-overlap_px)),np.array([self.vid_w-patch_size])])
+            x_coords = np.concatenate([np.arange(0,self.vid_w-patch_size[0],(patch_size[0]-x_overlap_px)),np.array([self.vid_w-patch_size[0]])])
         else:
-            x_coords = np.arange(0,self.vid_w,(patch_size-overlap_px))
-        if (self.vid_h - patch_size) % (patch_size-overlap_px) != 0:
+            x_coords = np.arange(0,self.vid_w,(patch_size[0]-x_overlap_px))
+        if (self.vid_h - patch_size[1]) % (patch_size[1]-y_overlap_px) != 0:
             num_patches_vertical += 1
-            y_coords = np.concatenate([np.arange(0,self.vid_h-patch_size,(patch_size-overlap_px)),np.array([self.vid_h-patch_size])])
+            y_coords = np.concatenate([np.arange(0,self.vid_h-patch_size[1],(patch_size[1]-y_overlap_px)),np.array([self.vid_h-patch_size[1]])])
         else:
-            y_coords = np.arange(0,self.vid_h,(patch_size-overlap_px))
+            y_coords = np.arange(0,self.vid_h,(patch_size[1]-y_overlap_px))
         
         # we use these patch coordinates to get crops as samples
         self.patch_coords_x, self.patch_coords_y = np.meshgrid(x_coords, y_coords)
@@ -194,8 +195,8 @@ class VideoPairs(Dataset):
         y_coord = self.patch_coords_y[y_coord,0]
 
         # read video patch, need to convert to tensor, current shape is (D,W,H,C)
-        compressed = get_video_frames(self.comp_video_files[video_number],self.img_frames,(self.patch_size,self.patch_size),(x_coord,y_coord))
-        ground_truth = get_video_frames(self.gt_video_files[video_number],self.img_frames,(self.patch_size,self.patch_size),(x_coord,y_coord)) 
+        compressed = get_video_frames(self.comp_video_files[video_number],self.img_frames,self.patch_size,(x_coord,y_coord))
+        ground_truth = get_video_frames(self.gt_video_files[video_number],self.img_frames,self.patch_size,(x_coord,y_coord)) 
         
         # now apply transforms, convert to tensor and permute dimensions to get (N,C,D,W,H)
         compressed = torch.tensor(compressed.transpose(3,0,1,2)).unsqueeze(0).float().div(255.0)
@@ -213,9 +214,10 @@ class VideoPairs(Dataset):
         gt = (torch.permute(gt[0],(1,2,3,0)).numpy()*255).astype(np.uint8)
 
         print(comp.shape,gt.shape)
-        out_comp = cv2.VideoWriter('out_comp.avi',cv2.VideoWriter_fourcc('M','J','P','G'), 30, (224,224))
-        out_gt = cv2.VideoWriter('out_gt.avi',cv2.VideoWriter_fourcc('M','J','P','G'), 30, (224,224))
+        out_comp = cv2.VideoWriter('out_comp.avi',cv2.VideoWriter_fourcc('M','J','P','G'), 30, self.patch_size)
+        out_gt = cv2.VideoWriter('out_gt.avi',cv2.VideoWriter_fourcc('M','J','P','G'), 30, self.patch_size)
 
+        i = 0
         for frame_comp, frame_gt in zip(comp,gt):
             out_comp.write(frame_comp)
             out_gt.write(frame_gt)
@@ -223,6 +225,7 @@ class VideoPairs(Dataset):
         out_comp.release()
         out_gt.release()
 
+        
         cap_comp = cv2.VideoCapture("out_comp.avi")
         cap_gt = cv2.VideoCapture("out_gt.avi")
 
@@ -255,11 +258,11 @@ def load_video_pairs(batch_size,rand_seed):
 
     # create the data loaders
     train_loader = torch.utils.data.DataLoader(vd_train, batch_size=batch_size, shuffle=True, pin_memory=True,num_workers=4)
-    val_loader = torch.utils.data.DataLoader(vd_val, batch_size=batch_size, shuffle=True, pin_memory=True,num_workers=4)
-    test_loader = torch.utils.data.DataLoader(vd_test, batch_size=batch_size, shuffle=True, pin_memory=True,num_workers=4)
+    val_loader = torch.utils.data.DataLoader(vd_val, batch_size=batch_size,pin_memory=True,num_workers=4)
+    test_loader = torch.utils.data.DataLoader(vd_test, batch_size=batch_size,pin_memory=True,num_workers=4)
     # return test_loader
     return (train_loader, val_loader, test_loader)
 
-vd = VideoPairs("/home/gc28692/Projects/data/video_pairs",True,training=True,testing=False,overlap_ratio=0.1)
+vd = VideoPairs("/home/gc28692/Projects/data/video_pairs",True,training=True,testing=False,overlap_ratio=0.0,patch_size=(1280,720))
 print("num crop samples",len(vd))
 vd.visualize_sample()

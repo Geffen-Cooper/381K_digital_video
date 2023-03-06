@@ -179,14 +179,12 @@ def validate(model, val_loader, device, loss_fn):
 
     with torch.no_grad():
         i=0
-        for data, target in tqdm(val_loader):
-            data, target = data.to(device), target.to(device)
+        for comp, gt in tqdm(val_loader):
+            comp, gt = comp.to(device), gt.to(device)
 
             # Forward
-            output = model(data)
-            val_loss += loss_fn(output, target).item()  # sum up batch loss
-            total_loss += val_loss
-            batch_size = target.size(0)
+            output = model(comp)
+            val_loss += loss_fn(output, gt).item() 
             i+=1
 
         # Compute loss and accuracy
