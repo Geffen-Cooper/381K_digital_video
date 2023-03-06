@@ -160,13 +160,14 @@ def train(model,train_loader,val_loader,test_loader,device,loss_fn,optimizer,arg
 
             if (batch_iter % args.log_interval) == 0:
                 # evaluate on all the validation sets
-                val_loss_PSNR = validate(model,val_loader,device,PSNR_loss())
-                val_loss_SSIM = validate(model,val_loader,device,SSIM_loss())
+                val_losses = validate(model,val_loader,device,[PSNR_loss(),SSIM_loss()])
+                val_loss_PSNR = val_losses[0]
+                val_loss_SSIM = val_losses[1]
                 
                 writer.add_scalar("Loss/val_PSNR", val_loss_PSNR, batch_iter)
                 writer.add_scalar("Loss/val_SSIM", val_loss_SSIM, batch_iter)
                 
-                print('Train Epoch: {} [{}/{} ({:.0f}%)] train loss: {:.3f}, val loss PSNR: {:.3f}, val loss SSIM: {:.3f}'.format(
+                print('********Validation, Epoch: {} [{}/{} ({:.0f}%)] train loss: {:.3f}, val loss PSNR: {:.3f}, val loss SSIM: {:.3f}'.format(
                     e, batch_idx * len(data), len(train_loader.dataset),
                     100. * batch_idx / len(train_loader), loss, val_loss_PSNR,val_loss_SSIM))
                 # scheduler1.step()
@@ -178,14 +179,14 @@ def train(model,train_loader,val_loader,test_loader,device,loss_fn,optimizer,arg
 
                 if best_val_loss > val_loss:
                     print("==================== best validation loss ====================")
-                    print("epoch: {}, val loss: {}".format(e,val_loss))
+                    print("Validation, epoch: {}, val loss: {}".format(e,val_loss))
                     best_val_loss = val_loss
                     torch.save({
                         'epoch': e+1,
                         'model_state_dict': model.state_dict(),
                         'val_loss': val_loss,
                         }, 'models/best_batch_i'+str(batch_iter)+args.log_name+str(time.time())+'.pth')
-            batch_iter+=1
+            batch_iter+=args.batch_size
         # scheduler2.step()
             
         # evaluate on all the validation sets
