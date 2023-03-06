@@ -15,6 +15,7 @@ import time
 Helper function to read video frames
 
 video_path (string): full path to video file
+is_img_frames (bool): video is set of image files rather than video file
 patch_size (tuple): (w,h) of square patch to extract from video 
 patch_coord (tuple): (x,y) top left coordinate of patch to extract
 num_frames (int): number of frames to get from the video
@@ -151,11 +152,11 @@ class VideoPairs(Dataset):
             first_frame = cv2.imread(self.comp_video_files[0][0])
 
         # We need to generate a mapping from the sample idx to a video crop
-        # For each video we will identify how many 224x224 regions fit in the video WxH,
-        # using an overlap of 50%. If the WxH is not divisible by 128, then for the last
+        # For each video we will identify how many patch_x by patch_y regions fit in the video WxH,
+        # using an overlap of overlap_ratio. If the WxH is not divisible by overlap_px, then for the last
         # crop just fit the remaining portion.
         
-        # print(first_frame.shape)
+        # video dimensions
         self.vid_h, self.vid_w = first_frame.shape[:2]
 
         # now get the coordinates of each patch using the given overlap ratio
@@ -187,8 +188,8 @@ class VideoPairs(Dataset):
     
         x_coord = (idx - video_number*(w*h)) % w
         y_coord = (idx - video_number*(w*h)) // w
-        print("video num:",video_number)
-        print(self.comp_video_files[video_number][0])
+        # print("video num:",video_number)
+        # print(self.comp_video_files[video_number][0])
 
         # scale to pixel coordinates
         x_coord = self.patch_coords_x[0,x_coord]
@@ -198,9 +199,9 @@ class VideoPairs(Dataset):
         compressed = get_video_frames(self.comp_video_files[video_number],self.img_frames,self.patch_size,(x_coord,y_coord))
         ground_truth = get_video_frames(self.gt_video_files[video_number],self.img_frames,self.patch_size,(x_coord,y_coord)) 
         
-        # now apply transforms, convert to tensor and permute dimensions to get (N,C,D,W,H)
-        compressed = torch.tensor(compressed.transpose(3,0,1,2)).unsqueeze(0).float().div(255.0)
-        ground_truth = torch.tensor(ground_truth.transpose(3,0,1,2)).unsqueeze(0).float().div(255.0)
+        # now apply transforms, convert to tensor and permute dimensions to get (C,D,W,H)
+        compressed = torch.tensor(compressed.transpose(3,0,1,2)).float().div(255.0)
+        ground_truth = torch.tensor(ground_truth.transpose(3,0,1,2)).float().div(255.0)
 
         return compressed, ground_truth
 
@@ -250,19 +251,21 @@ class VideoPairs(Dataset):
 
 
 def load_video_pairs(batch_size,rand_seed):
-    root_dir = "/home/gc28692/Projects/381K_digital_video/HW2"
+    root_dir = "/home/gc28692/Projects/data/video_pairs"
 
-    vd_train = VideoPairs(root_dir,True,224,0.5,None,training=True,validation=False,testing=False)
-    vd_val = VideoPairs(root_dir,True,224,0.5,None,training=False,validation=True,testing=False)
-    vd_test = VideoPairs(root_dir,True,224,0.5,None,training=False,validation=False,testing=True)
+    vd_train = VideoPairs(root_dir,True,(224,224),0.0,None,training=True,validation=False,testing=False)
+    vd_val = VideoPairs(root_dir,True,(1280,720),0.0,None,training=False,validation=True,testing=False)
+    vd_test = VideoPairs(root_dir,True,(1280,720),0.0,None,training=False,validation=False,testing=True)
 
     # create the data loaders
     train_loader = torch.utils.data.DataLoader(vd_train, batch_size=batch_size, shuffle=True, pin_memory=True,num_workers=4)
-    val_loader = torch.utils.data.DataLoader(vd_val, batch_size=batch_size,pin_memory=True,num_workers=4)
-    test_loader = torch.utils.data.DataLoader(vd_test, batch_size=batch_size,pin_memory=True,num_workers=4)
+    val_loader = torch.utils.data.DataLoader(vd_val, batch_size=1,pin_memory=True)
+    test_loader = torch.utils.data.DataLoader(vd_test, batch_size=1,pin_memory=True)
+
+    
     # return test_loader
     return (train_loader, val_loader, test_loader)
 
-vd = VideoPairs("/home/gc28692/Projects/data/video_pairs",True,training=True,testing=False,overlap_ratio=0.0,patch_size=(1280,720))
-print("num crop samples",len(vd))
-vd.visualize_sample()
+# vd = VideoPairs("/home/gc28692/Projects/data/video_pairs",True,training=True,testing=False,overlap_ratio=0.0,patch_size=(1280,720))
+# print("num crop samples",len(vd))
+# vd.visualize_sample()

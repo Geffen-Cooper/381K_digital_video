@@ -30,13 +30,13 @@ class ArtifactReduction(nn.Module):
         # will collapse a volume into a single channel as it did in 2D 
 
         # (1 x 3 x 100 x 224 x 224) --> (1 x 16 x 100 x 224 x 224)
-        self.conv1 = nn.Conv3d(in_channels=3, out_channels=16, kernel_size=3, padding=1) 
+        self.conv1 = nn.Conv3d(in_channels=3, out_channels=8, kernel_size=3, padding=1) 
         
         # (1 x 16 x 100 x 224 x 224) --> (1 x 32 x 100 x 224 x 224)
-        self.conv2 = nn.Conv3d(in_channels=16, out_channels=32, kernel_size=3, padding=1) 
+        self.conv2 = nn.Conv3d(in_channels=8, out_channels=16, kernel_size=3, padding=1) 
 
         # (1 x 32 x 100 x 224 x 224) --> (1 x 3 x 100 x 224 x 224)
-        self.conv3 = nn.Conv3d(in_channels=3, out_channels=3, kernel_size=3, padding=1) 
+        self.conv3 = nn.Conv3d(in_channels=16, out_channels=3, kernel_size=3, padding=1) 
 
     def forward(self, x):
         x = self.conv1(x)

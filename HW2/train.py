@@ -118,7 +118,7 @@ class SSIM_loss(nn.Module):
 
 
 
-def train(model,train_loader,val_loader,device,loss_fn,optimizer,args):
+def train(model,train_loader,val_loader,test_loader,device,loss_fn,optimizer,args):
     
     # init tensorboard
     writer = SummaryWriter()
@@ -134,7 +134,13 @@ def train(model,train_loader,val_loader,device,loss_fn,optimizer,args):
     model = model.to(device)
     batch_iter = 0
 
+    # how many epochs the validation loss did not decrease, 
+    # used for early stopping
+    num_epochs_worse = 0
     for e in range(args.epochs):
+        # stop training, run on the test set
+        if num_epochs_worse == args.ese:
+            break
         for batch_idx, (data, target) in enumerate(train_loader):
             data, target = data.to(device), target.to(device)
 
@@ -150,16 +156,56 @@ def train(model,train_loader,val_loader,device,loss_fn,optimizer,args):
                 100. * batch_idx / len(train_loader), loss))#, scheduler1.get_last_lr()[0]))
             # if batch_idx > 0:
             #     scheduler1.step()
+            
+
+            if (batch_iter % args.log_interval) == 0:
+                # evaluate on all the validation sets
+                val_loss_PSNR = validate(model,val_loader,device,PSNR_loss())
+                val_loss_SSIM = validate(model,val_loader,device,SSIM_loss())
+                
+                writer.add_scalar("Loss/val_PSNR", val_loss_PSNR, batch_iter)
+                writer.add_scalar("Loss/val_SSIM", val_loss_SSIM, batch_iter)
+                
+                print('Train Epoch: {} [{}/{} ({:.0f}%)] train loss: {:.3f}, val loss PSNR: {:.3f}, val loss SSIM: {:.3f}'.format(
+                    e, batch_idx * len(data), len(train_loader.dataset),
+                    100. * batch_idx / len(train_loader), loss, val_loss_PSNR,val_loss_SSIM))
+                # scheduler1.step()
+
+                if args.val_loss == "PSNR":
+                    val_loss = val_loss_PSNR
+                elif args.val_loss == "SSIM":
+                    val_loss = val_loss_SSIM
+
+                if best_val_loss > val_loss:
+                    print("==================== best validation loss ====================")
+                    print("epoch: {}, val loss: {}".format(e,val_loss))
+                    best_val_loss = val_loss
+                    torch.save({
+                        'epoch': e+1,
+                        'model_state_dict': model.state_dict(),
+                        'val_loss': val_loss,
+                        }, 'models/best_batch_i'+str(batch_iter)+args.log_name+str(time.time())+'.pth')
             batch_iter+=1
         # scheduler2.step()
             
         # evaluate on all the validation sets
-        val_loss = validate(model,val_loader,device,loss_fn)
-        writer.add_scalar("Loss/val", val_loss, batch_iter)
-        print('Train Epoch: {} [{}/{} ({:.0f}%)] train loss: {:.3f}, val loss: {:.3f}'.format(
+        val_losses = validate(model,val_loader,device,[PSNR_loss(),SSIM_loss()])
+        val_loss_PSNR = val_losses[0]
+        val_loss_SSIM = val_losses[1]
+        
+        writer.add_scalar("Loss/val_PSNR", val_loss_PSNR, batch_iter)
+        writer.add_scalar("Loss/val_SSIM", val_loss_SSIM, batch_iter)
+        
+        print('Train Epoch: {} [{}/{} ({:.0f}%)] train loss: {:.3f}, val loss PSNR: {:.3f}, val loss SSIM: {:.3f}'.format(
             e, batch_idx * len(data), len(train_loader.dataset),
-            100. * batch_idx / len(train_loader), loss, val_loss))
+            100. * batch_idx / len(train_loader), loss, val_loss_PSNR,val_loss_SSIM))
         # scheduler1.step()
+
+        if args.val_loss == "PSNR":
+            val_loss = val_loss_PSNR
+        elif args.val_loss == "SSIM":
+            val_loss = val_loss_SSIM
+
         if best_val_loss > val_loss:
             print("==================== best validation loss ====================")
             print("epoch: {}, val loss: {}".format(e,val_loss))
@@ -170,26 +216,44 @@ def train(model,train_loader,val_loader,device,loss_fn,optimizer,args):
                 'val_loss': val_loss,
                 }, 'models/best_batch_i'+str(batch_iter)+args.log_name+str(time.time())+'.pth')
         # scheduler2.step()
+        else:
+            num_epochs_worse += 1
+    
+    # evaluate on test set
+    print("\n\n\n==================== TRAINING FINISHED ====================")
+    print("Evaluating on test set")
+    test_loss_PSNR = validate(model,test_loader,device,PSNR_loss())
+    test_loss_SSIM = validate(model,test_loader,device,SSIM_loss())
+    
+    print('test loss PSNR: {:.3f}, test loss SSIM: {:.3f}'.format(
+          test_loss_PSNR,test_loss_SSIM))
+
 
     
-def validate(model, val_loader, device, loss_fn):
+def validate(model, val_loader, device, loss_fns):
     model.eval()
     model = model.to(device)
-    val_loss = 0
+    val_losses = torch.zeros(len(loss_fns))
 
+    # the loss functions take care of reshaping the input
+    # and averaging over all frames
     with torch.no_grad():
         i=0
+        # validate over each video
         for comp, gt in tqdm(val_loader):
             comp, gt = comp.to(device), gt.to(device)
 
             # Forward
             output = model(comp)
-            val_loss += loss_fn(output, gt).item() 
+
+            # get loss over whole video
+            for j,loss_fn in enumerate(loss_fns):
+                val_losses[j] += loss_fn(output, gt).item() 
             i+=1
 
         # Compute loss and accuracy
-        val_loss /= i
-        return val_loss
+        val_losses /= i
+        return val_losses
 
 
 # ===================================== Command Line Arguments =====================================
@@ -198,19 +262,22 @@ def parse_args():
 
     # logging details
     parser.add_argument('--loss', type=str, default = 'L1', help='loss function')
+    parser.add_argument('--val-loss', type=str, default = 'PSNR', help='validation loss function')
     parser.add_argument('--opt', type=str, default = 'SGD', help='optimizer')
     parser.add_argument('--log_name', type=str, default = 'default', help='checkpoint file name')
     parser.add_argument('--batch-size', type=int, default=1, metavar='N',
                         help='input batch size for training (default: 64)')
     parser.add_argument('--epochs', type=int, default=100, metavar='N',
                         help='number of epochs to train')
+    parser.add_argument('--ese', type=int, default=3, metavar='N',
+                        help='early stopping epochs')
     parser.add_argument('--lr', type=float, default=0.01, metavar='LR',
                         help='learning rate')
     parser.add_argument('--no-cuda', action='store_true', default=False,
                         help='disables CUDA training')
     parser.add_argument('--seed', type=int, default=1, metavar='S',
                         help='random seed (default: 1)')
-    parser.add_argument('--log-interval', type=int, default=1, metavar='N',
+    parser.add_argument('--log-interval', type=int, default=400, metavar='N',
                         help='how many batches to wait before logging training status')
 
 
@@ -221,15 +288,14 @@ def parse_args():
     
 # ===================================== Main =====================================
 if __name__ == "__main__":
-    # vd = VideoPairs("/home/gc28692/Projects/data/video_pairs",True,training=False,testing=True)
+    # vd = VideoPairs("/home/gc28692/Projects/data/video_pairs",True,training=False,validation=True,patch_size=(1280,720),overlap_ratio=0)
     # psnr = PSNR_loss()
     # ssim = SSIM_loss()
-    # comp,gt = vd.__getitem__(20)
+    # comp,gt = vd.__getitem__(1)
     # print(psnr(comp,gt))
     # print(ssim(comp,gt))
+    # vd.visualize_sample()
     # exit()
-    vd = VideoPairs("/home/gc28692/Projects/data/video_pairs",True,training=False,testing=True)
-    exit()
     print("=================")
     # get arguments
     args = parse_args()
@@ -268,4 +334,4 @@ if __name__ == "__main__":
     elif args.opt == "Adam":
         opt = torch.optim.Adam(params=model.parameters(),lr=args.lr)
 
-    train(model,train_loader,val_loader,device,loss,opt,args)
+    train(model,train_loader,val_loader,test_loader,device,loss,opt,args)
