@@ -135,7 +135,6 @@ class VideoPairs(Dataset):
         else:
             # store files for each subfolder
             subfolders = os.listdir(os.path.join(self.video_path,"compressed"))
-            # subfolders = sorted(subfolders,key=lambda x: int(os.path.splitext(x)[0]))
 
             self.comp_video_files = [[] for i in range(len(subfolders))]
             self.gt_video_files = [[] for i in range(len(subfolders))]
@@ -161,21 +160,21 @@ class VideoPairs(Dataset):
 
         # now get the coordinates of each patch using the given overlap ratio
         overlap_px = int(self.patch_size*overlap_ratio)
-        num_patches_horizontal = (self.vid_w - patch_size) // overlap_px
-        num_patches_vertical = (self.vid_h - patch_size) // overlap_px
+        num_patches_horizontal = (self.vid_w - patch_size) // (patch_size-overlap_px)
+        num_patches_vertical = (self.vid_h - patch_size) // (patch_size-overlap_px)
         
 
         # patch doesn't fit evenly
-        if (self.vid_w - patch_size) % overlap_px != 0:
+        if (self.vid_w - patch_size) % (patch_size-overlap_px) != 0:
             num_patches_horizontal += 1
-            x_coords = np.concatenate([np.arange(0,self.vid_w-patch_size,overlap_px),np.array([self.vid_w-patch_size])])
+            x_coords = np.concatenate([np.arange(0,self.vid_w-patch_size,(patch_size-overlap_px)),np.array([self.vid_w-patch_size])])
         else:
-            x_coords = np.arange(0,self.vid_w,overlap_px)
-        if (self.vid_h - patch_size) % overlap_px != 0:
+            x_coords = np.arange(0,self.vid_w,(patch_size-overlap_px))
+        if (self.vid_h - patch_size) % (patch_size-overlap_px) != 0:
             num_patches_vertical += 1
-            y_coords = np.concatenate([np.arange(0,self.vid_h-patch_size,overlap_px),np.array([self.vid_h-patch_size])])
+            y_coords = np.concatenate([np.arange(0,self.vid_h-patch_size,(patch_size-overlap_px)),np.array([self.vid_h-patch_size])])
         else:
-            y_coords = np.arange(0,self.vid_h,overlap_px)
+            y_coords = np.arange(0,self.vid_h,(patch_size-overlap_px))
         
         # we use these patch coordinates to get crops as samples
         self.patch_coords_x, self.patch_coords_y = np.meshgrid(x_coords, y_coords)
@@ -187,20 +186,20 @@ class VideoPairs(Dataset):
     
         x_coord = (idx - video_number*(w*h)) % w
         y_coord = (idx - video_number*(w*h)) // w
-        print(video_number)
+        print("video num:",video_number)
         print(self.comp_video_files[video_number][0])
 
         # scale to pixel coordinates
         x_coord = self.patch_coords_x[0,x_coord]
         y_coord = self.patch_coords_y[y_coord,0]
 
-        # read video patch, need to convert to tensor
+        # read video patch, need to convert to tensor, current shape is (D,W,H,C)
         compressed = get_video_frames(self.comp_video_files[video_number],self.img_frames,(self.patch_size,self.patch_size),(x_coord,y_coord))
         ground_truth = get_video_frames(self.gt_video_files[video_number],self.img_frames,(self.patch_size,self.patch_size),(x_coord,y_coord)) 
         
-        # now apply transforms, convert to tensor and permute dimensions
-        compressed = torch.permute(torch.tensor(compressed),(3,0,1,2))
-        ground_truth = torch.permute(torch.tensor(ground_truth),(3,0,1,2))
+        # now apply transforms, convert to tensor and permute dimensions to get (N,C,D,W,H)
+        compressed = torch.tensor(compressed.transpose(3,0,1,2)).unsqueeze(0).float().div(255.0)
+        ground_truth = torch.tensor(ground_truth.transpose(3,0,1,2)).unsqueeze(0).float().div(255.0)
 
         return compressed, ground_truth
 
@@ -208,9 +207,10 @@ class VideoPairs(Dataset):
         return self.patch_coords_x.shape[0]*self.patch_coords_x.shape[1]*self.num_videos
 
     def visualize_sample(self):
-        comp,gt = self.__getitem__(700)
-        comp = torch.permute(comp,(1,2,3,0)).numpy().astype(np.uint8)
-        gt = torch.permute(gt,(1,2,3,0)).numpy().astype(np.uint8)
+        comp,gt = self.__getitem__(torch.randperm(len(self))[0])
+        # inputs are (N,C,D,W,H), need to convert back to (D,W,H,C) and uint8
+        comp = (torch.permute(comp[0],(1,2,3,0)).numpy()*255).astype(np.uint8)
+        gt = (torch.permute(gt[0],(1,2,3,0)).numpy()*255).astype(np.uint8)
 
         print(comp.shape,gt.shape)
         out_comp = cv2.VideoWriter('out_comp.avi',cv2.VideoWriter_fourcc('M','J','P','G'), 30, (224,224))
@@ -260,6 +260,6 @@ def load_video_pairs(batch_size,rand_seed):
     # return test_loader
     return (train_loader, val_loader, test_loader)
 
-vd = VideoPairs("/home/gc28692/Projects/data/video_pairs",True,training=False,testing=True)
+vd = VideoPairs("/home/gc28692/Projects/data/video_pairs",True,training=True,testing=False,overlap_ratio=0.1)
 print("num crop samples",len(vd))
 vd.visualize_sample()

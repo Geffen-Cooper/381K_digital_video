@@ -15,6 +15,108 @@ from tqdm import tqdm
 import time
 from datasets import *
 from models import *
+import math
+
+# the input will be a video frame (C,W,H)
+def PSNR(comp, gt):
+    mse = F.mse_loss(comp,gt)
+    max_val = 255 # videos are uint8 
+    return 10*torch.log10(max_val**2/(mse+1e-6))
+
+# expects the video volumes as inputs (N,C,D,W,H)
+class PSNR_loss(nn.Module):
+    def __init__(self) -> None:
+        super(PSNR_loss,self).__init__()
+
+    def forward(self,output,target):
+        # first reshape into (D,C,W,H)
+        output = torch.permute(output[0],(1,0,2,3))
+        target = torch.permute(target[0],(1,0,2,3))
+
+        # average PSNR over all frames
+        loss = 0
+        for comp,gt in zip(output,target):
+            loss += PSNR(comp,gt)
+        return loss / len(output)
+
+
+# this SSIM code is taken from the following source
+# https://medium.com/srm-mic/all-about-structural-similarity-index-ssim-theory-code-in-pytorch-6551b455541e
+
+def get_gaussian_window(window_size,sigma):
+    # get densities values of 2D gaussian distribution
+        # define region
+    x = np.arange(0,window_size)
+    y = np.arange(0,window_size)
+    mu = window_size // 2
+    xx,yy = np.meshgrid(x,y)
+
+    g_window = np.zeros((window_size,window_size))
+
+    # fill the window
+    for row,y in enumerate(yy):
+        for col,x in enumerate(xx):
+            g_window[row,col] = 1/(np.sqrt(2*np.pi)*sigma)*np.exp(-np.square(x[col]-mu)/(2*sigma**2))*\
+                                1/(np.sqrt(2*np.pi)*sigma)*np.exp(-np.square(y[row]-mu)/(2*sigma**2))
+
+
+    # normalize
+    return torch.tensor(g_window/np.sum(g_window)).unsqueeze(0).expand(3,1,window_size,window_size).float()
+
+# the input will be a video frame (C,W,H)
+def SSIM(comp, gt, window):
+    L = 1 # we normalized the image to [0,1]
+    pad = window.shape[-1] // 2
+    window = window.to(comp.device)
+    
+    # convolve input image with gaussian window, treat each RGB channel independently
+    # this gets the localized means
+    mu1 = F.conv2d(comp,window,padding=pad,groups=3)
+    mu2 = F.conv2d(gt,window,padding=pad,groups=3)
+    mu1_sq = mu1**2
+    mu2_sq = mu2**2
+    mu12 = mu1*mu2
+
+    # get the variance parameters
+    sigma1_sq = F.conv2d(comp * comp,window,padding=pad,groups=3) - mu1_sq
+    sigma2_sq = F.conv2d(gt * gt,window,padding=pad,groups=3) - mu2_sq
+    sigma12 =  F.conv2d(comp * gt, window,padding=pad,groups=3) - mu12
+
+    # constants 
+    C1 = (0.01 ) ** 2
+    C2 = (0.03 ) ** 2 
+
+    contrast_metric = (2.0 * sigma12 + C2) / (sigma1_sq + sigma2_sq + C2)
+    contrast_metric = torch.mean(contrast_metric)
+
+    numerator1 = 2 * mu12 + C1  
+    numerator2 = 2 * sigma12 + C2
+    denominator1 = mu1_sq + mu2_sq + C1 
+    denominator2 = sigma1_sq + sigma2_sq + C2
+
+    ssim_score = (numerator1 * numerator2) / (denominator1 * denominator2)
+
+    return ssim_score.mean()
+
+# expects the video volumes as inputs (N,C,D,W,H)
+class SSIM_loss(nn.Module):
+    def __init__(self,window_size=11,sigma=1.5) -> None:
+        super(SSIM_loss,self).__init__()
+        self.window = get_gaussian_window(window_size,sigma)
+
+    def forward(self,output,target):
+        # first reshape into (D,C,W,H)
+        output = torch.permute(output[0],(1,0,2,3))
+        target = torch.permute(target[0],(1,0,2,3))
+
+        # average SSIM over all frames
+        loss = 0
+        for comp,gt in zip(output,target):
+            loss += SSIM(comp,gt,self.window)
+        return loss / len(output)
+
+
+
 
 def train(model,train_loader,val_loader,device,loss_fn,optimizer,args):
     
@@ -121,6 +223,15 @@ def parse_args():
     
 # ===================================== Main =====================================
 if __name__ == "__main__":
+    # vd = VideoPairs("/home/gc28692/Projects/data/video_pairs",True,training=False,testing=True)
+    # psnr = PSNR_loss()
+    # ssim = SSIM_loss()
+    # comp,gt = vd.__getitem__(20)
+    # print(psnr(comp,gt))
+    # print(ssim(comp,gt))
+    # exit()
+    vd = VideoPairs("/home/gc28692/Projects/data/video_pairs",True,training=False,testing=True)
+    exit()
     print("=================")
     # get arguments
     args = parse_args()
@@ -149,7 +260,9 @@ if __name__ == "__main__":
     elif args.loss == "Huber":
         loss = torch.nn.HuberLoss()
     elif args.loss == "SSIM":
-        pass
+        loss = SSIM_loss()
+    elif args.loss == "PSNR":
+        loss = PSNR_loss()
 
     # set optimizer
     if args.opt == "SGD":
