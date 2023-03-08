@@ -29,22 +29,33 @@ class ArtifactReduction(nn.Module):
         # the number of output channels corresponds to the number of filters since each filter
         # will collapse a volume into a single channel as it did in 2D 
 
-        # (1 x 3 x 100 x 224 x 224) --> (1 x 16 x 100 x 224 x 224)
-        self.conv1 = nn.Conv3d(in_channels=3, out_channels=8, kernel_size=3, padding=1) 
+        # (1 x 3 x 5 x 224 x 224) --> (1 x 16 x 5 x 224 x 224)
+        self.conv1 = nn.Conv3d(in_channels=3, out_channels=16, kernel_size=3, padding=1)
+        # torch.nn.init.kaiming_normal_(self.conv1.weight, mode='fan_in',nonlinearity='leaky_relu') 
         
-        # (1 x 16 x 100 x 224 x 224) --> (1 x 32 x 100 x 224 x 224)
-        self.conv2 = nn.Conv3d(in_channels=8, out_channels=16, kernel_size=3, padding=1) 
+        # (1 x 16 x 5 x 224 x 224) --> (1 x 32 x 5 x 224 x 224)
+        self.conv2 = nn.Conv3d(in_channels=16, out_channels=32, kernel_size=3, padding=1) 
+        # self.conv3 = nn.Conv3d(in_channels=8, out_channels=4, kernel_size=3, padding=1) 
+        # torch.nn.init.kaiming_normal_(self.conv2.weight, mode='fan_in',nonlinearity='leaky_relu') 
 
-        # (1 x 32 x 100 x 224 x 224) --> (1 x 3 x 100 x 224 x 224)
-        self.conv3 = nn.Conv3d(in_channels=16, out_channels=3, kernel_size=3, padding=1) 
+        # (1 x 32 x 5 x 224 x 224) --> (1 x 3 x 5 x 224 x 224)
+        self.conv3 = nn.Conv3d(in_channels=32, out_channels=3, kernel_size=(7,3,3), padding=1)
+
+        # (1 x 3 x 5 x 224 x 224) --> (1 x 3 x 1 x 224 x 224)
+        # self.conv4 = nn.Conv3d(in_channels=3, out_channels=3, kernel_size=(7,3,3), padding=1)
 
     def forward(self, x):
-        x = self.conv1(x)
-        x = F.relu(x)
+        # print("model input:",x.shape)
+        x1 = self.conv1(x)
+        x1 = F.leaky_relu(x1)
 
-        x = self.conv2(x)
-        x = F.relu(x)
+        x2 = self.conv2(x1)
+        x2 = F.leaky_relu(x2)
 
-        x = self.conv3(x)
+        x3 = self.conv3(x2).squeeze(2) + x[:,:,2,:,:]
+        # x3 = F.leaky_relu(x3)
 
-        return x
+        # x4 = self.conv4(x3).squeeze(2) #+ x[0,:,2,:,:]
+        # print("model output:",x4.shape)
+
+        return x3

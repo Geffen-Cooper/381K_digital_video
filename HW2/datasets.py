@@ -11,6 +11,8 @@ import numpy as np
 import cv2
 import time
 
+from train import *
+
 """
 Helper function to read video frames
 
@@ -96,7 +98,7 @@ class VideoPairs(Dataset):
     """Video Pairs Dataset.
     """
 
-    def __init__(self, root_dir,img_frames=True,patch_size=224,overlap_ratio=0.5,transform=None,training=True,validation=False,testing=False):
+    def __init__(self, root_dir,img_frames=True,patch_size=224,overlap_ratio=0.5,frame_depth=10,transform=None,training=True,validation=False,testing=False):
         """
         Args:
             root_dir (string): directory where the training/validation/test splits are
@@ -208,37 +210,80 @@ class VideoPairs(Dataset):
     def __len__(self):
         return self.patch_coords_x.shape[0]*self.patch_coords_x.shape[1]*self.num_videos
 
-    def visualize_sample(self):
-        comp,gt = self.__getitem__(torch.randperm(len(self))[0])
-        # inputs are (N,C,D,W,H), need to convert back to (D,W,H,C) and uint8
-        comp = (torch.permute(comp[0],(1,2,3,0)).numpy()*255).astype(np.uint8)
-        gt = (torch.permute(gt[0],(1,2,3,0)).numpy()*255).astype(np.uint8)
+    def visualize_sample(self,model=None):
+        # to visualize from the trained model just pass it through the model before conversion
+        # also print out the PSNR and SSIM before and after passing through the model
+        comp,gt = self.__getitem__(5)#torch.randperm(len(self))[0])
+        comp = comp.unsqueeze(0).to('cuda')
+        gt = gt.unsqueeze(0).to('cuda')
+        aft = torch.clone(comp)
 
-        print(comp.shape,gt.shape)
+        with torch.no_grad():
+            print("before")
+            print(PSNR_metric()(comp,gt))
+            print(SSIM_metric()(comp,gt))
+            if model != None: 
+                model.to('cuda')
+                frame_depth = 5
+                patch_size = self.patch_size
+                # go over each frame
+                for depth_coord in range(100):
+                    # if at the beginning add padding
+                    if depth_coord < frame_depth//2:
+                        frames = torch.cat([torch.zeros((1,3,frame_depth//2-depth_coord,patch_size[1],patch_size[0])).to('cuda'),comp[:,:,:depth_coord+frame_depth//2+1,:,:]],dim=2)
+                    # if at the end add padding
+                    elif (99-depth_coord) < frame_depth//2:
+                        frames = torch.cat([comp[:,:,depth_coord-frame_depth//2:,:,:],torch.zeros((1,3,depth_coord-99+frame_depth//2,patch_size[1],patch_size[0])).to('cuda')],dim=2)
+                    # otherwise get frames [t-2,t-1,t,t+1,t+2] where t is ground truth
+                    else:
+                        # get frame_depth frames for training, and the ground truth is the middle frame
+                        frames = comp[:,:,depth_coord-frame_depth//2:depth_coord+frame_depth//2+1,:,:]
+                
+                    # forward, output is a single frame
+                    aft[:,:,depth_coord,:,:] = model(frames)
+                print("after")
+                print(PSNR_metric()(aft,gt))
+                print(SSIM_metric()(aft,gt))
+            else:
+                aft = gt
+        # inputs are (N,C,D,W,H), need to convert back to (D,W,H,C) and uint8
+        comp = (torch.permute(comp[0].to('cpu'),(1,2,3,0)).numpy()*255).astype(np.uint8)
+        aft = (torch.permute(aft[0].to('cpu'),(1,2,3,0)).numpy()*255).astype(np.uint8)
+        # gt = (torch.permute(gt[0],(1,2,3,0)).numpy()*255).astype(np.uint8)
+
+        print(comp.shape,aft.shape)
         out_comp = cv2.VideoWriter('out_comp.avi',cv2.VideoWriter_fourcc('M','J','P','G'), 30, self.patch_size)
-        out_gt = cv2.VideoWriter('out_gt.avi',cv2.VideoWriter_fourcc('M','J','P','G'), 30, self.patch_size)
+        out_aft = cv2.VideoWriter('out_aft.avi',cv2.VideoWriter_fourcc('M','J','P','G'), 30, self.patch_size)
+        # out_gt = cv2.VideoWriter('out_gt.avi',cv2.VideoWriter_fourcc('M','J','P','G'), 30, self.patch_size)
 
         i = 0
-        for frame_comp, frame_gt in zip(comp,gt):
+        # for frame_comp, frame_gt in zip(comp,gt):
+        #     out_comp.write(frame_comp)
+        #     out_gt.write(frame_gt)
+        for frame_comp, frame_aft in zip(comp,aft):
             out_comp.write(frame_comp)
-            out_gt.write(frame_gt)
+            out_aft.write(frame_aft)
 
         out_comp.release()
-        out_gt.release()
+        out_aft.release()
+        # out_gt.release()
 
         
         cap_comp = cv2.VideoCapture("out_comp.avi")
-        cap_gt = cv2.VideoCapture("out_gt.avi")
+        cap_aft = cv2.VideoCapture("out_aft.avi")
+        # cap_gt = cv2.VideoCapture("out_gt.avi")
 
         while(True):
             ret_comp, frame_comp = cap_comp.read()
-            ret_gt, frame_gt = cap_gt.read()
+            ret_aft, frame_aft = cap_aft.read()
+            # ret_gt, frame_gt = cap_gt.read()
 
-            if ret_comp == True and ret_gt == True: 
+            if ret_comp == True and ret_aft == True:#ret_gt == True: 
                 
                 # Display the resulting frame    
                 cv2.imshow('comp',frame_comp)
-                cv2.imshow('gt',frame_gt)
+                cv2.imshow('aft',frame_aft)
+                # cv2.imshow('gt',frame_gt)
                 
                 if cv2.waitKey(40) & 0xFF == ord('q'):
                     break
@@ -246,7 +291,8 @@ class VideoPairs(Dataset):
             # Break the loop
             else:
                 cap_comp.set(cv2.CAP_PROP_POS_FRAMES, 0)
-                cap_gt.set(cv2.CAP_PROP_POS_FRAMES, 0)
+                cap_aft.set(cv2.CAP_PROP_POS_FRAMES, 0)
+                # cap_gt.set(cv2.CAP_PROP_POS_FRAMES, 0)
                 # break 
 
 
@@ -258,9 +304,9 @@ def load_video_pairs(batch_size,rand_seed):
     vd_test = VideoPairs(root_dir,True,(1280,720),0.0,None,training=False,validation=False,testing=True)
 
     # create the data loaders
-    train_loader = torch.utils.data.DataLoader(vd_train, batch_size=batch_size, shuffle=True, pin_memory=True,num_workers=4)
-    val_loader = torch.utils.data.DataLoader(vd_val, batch_size=1,pin_memory=True)
-    test_loader = torch.utils.data.DataLoader(vd_test, batch_size=1,pin_memory=True)
+    train_loader = torch.utils.data.DataLoader(vd_train, batch_size=batch_size, shuffle=True,num_workers=4)
+    val_loader = torch.utils.data.DataLoader(vd_val, batch_size=1)
+    test_loader = torch.utils.data.DataLoader(vd_test, batch_size=1)
 
     
     # return test_loader
