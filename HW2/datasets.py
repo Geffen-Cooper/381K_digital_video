@@ -213,11 +213,10 @@ class VideoPairs(Dataset):
     def visualize_sample(self,model=None):
         # to visualize from the trained model just pass it through the model before conversion
         # also print out the PSNR and SSIM before and after passing through the model
-        comp,gt = self.__getitem__(5)#torch.randperm(len(self))[0])
+        comp,gt = self.__getitem__(10)#torch.randperm(len(self))[0])
         comp = comp.unsqueeze(0).to('cuda')
         gt = gt.unsqueeze(0).to('cuda')
         aft = torch.clone(comp)
-
         with torch.no_grad():
             print("before")
             print(PSNR_metric()(comp,gt))
@@ -240,13 +239,15 @@ class VideoPairs(Dataset):
                         frames = comp[:,:,depth_coord-frame_depth//2:depth_coord+frame_depth//2+1,:,:]
                 
                     # forward, output is a single frame
-                    aft[:,:,depth_coord,:,:] = model(frames)
+                    output = model(frames)
+                    aft[:,:,depth_coord,:,:] = (output-output.min())/(output.max()-output.min())
                 print("after")
                 print(PSNR_metric()(aft,gt))
                 print(SSIM_metric()(aft,gt))
             else:
                 aft = gt
         # inputs are (N,C,D,W,H), need to convert back to (D,W,H,C) and uint8
+        
         comp = (torch.permute(comp[0].to('cpu'),(1,2,3,0)).numpy()*255).astype(np.uint8)
         aft = (torch.permute(aft[0].to('cpu'),(1,2,3,0)).numpy()*255).astype(np.uint8)
         # gt = (torch.permute(gt[0],(1,2,3,0)).numpy()*255).astype(np.uint8)

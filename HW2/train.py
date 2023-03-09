@@ -17,11 +17,13 @@ from datasets import *
 from models import *
 import math
 import time
+import cv2
 
 # the input will be a video frame (C,W,H)
 def PSNR(comp, gt):
+    # comp = (comp-comp.min())/(comp.max()-comp.min())
     mse = F.mse_loss(comp,gt)
-    max_val = 1 # videos are uint8 
+    max_val = 1
     return 10*torch.log10(max_val**2/(mse+1e-12))
 
 # expects frames as inputs (N,C,1,W,H)
@@ -63,6 +65,7 @@ def get_gaussian_window(window_size,sigma):
 
 # the input will be a video frame (C,W,H)
 def SSIM(comp, gt, window):
+    # comp = (comp-comp.min())/(comp.max()-comp.min())
     L = 1 # we normalized the image to [0,1]
     pad = window.shape[-1] // 2
     window = window.to(comp.device)
@@ -130,6 +133,14 @@ class SSIM_metric(nn.Module):
                 # print(comp_f.shape,gt_f.shape)
                 score += SSIM(comp_f,gt_f,self.window)
             avg = score / (output.shape[0])
+            # with torch.no_grad():
+            #     while True:
+            #         if avg > 0.8:
+            #             output[output > 1] = 1
+            #             output[output < 0] = 0
+            #             cv2.imshow(output*255)
+            #         if cv2.waitKey(40) & 0xFF == ord('q'):
+            #             break
 
             # we want to maximize SSIM so use negative
             # of it to use as a loss that we minimize
@@ -185,13 +196,34 @@ def train(model,train_loader,val_loader,test_loader,device,loss_fn,optimizer,arg
                     ground_truth = target[:,:,depth_coord,:,:]
 
                 optimizer.zero_grad()
-
+                model.train()
                 # the model outputs the prediction for a single frame [t-2,t-1,t,t+1,t+2]
                 output = model(frames)
-                loss = loss_fn(output, ground_truth)
+                
+                loss = loss_fn(output, ground_truth) #+ nn.MSELoss()(output,ground_truth)
                 writer.add_scalar("Metric/train_"+args.loss, loss, batch_iter)
                 loss.backward()
                 optimizer.step()
+
+                with torch.no_grad():
+                    if batch_idx % 10 == 0:
+                        bef = frames[0,:,2,:,:]
+                        aft = output[0]
+                        gt = ground_truth[0]
+                        bef = torch.permute(bef,(1,2,0)).cpu().numpy()
+                        aft = torch.permute(aft,(1,2,0)).cpu().numpy()
+                        gt = torch.permute(gt,(1,2,0)).cpu().numpy()
+                        bef = bef[...,::-1]
+                        aft = aft[...,::-1]
+                        gt = gt[...,::-1]
+                        f,ax = plt.subplots(1,3)
+                        ax[0].imshow(bef)
+                        ax[1].imshow(aft)
+                        ax[2].imshow(gt)
+                        f.savefig("fig.png")
+                        plt.close()
+                #         # plt.imshow(comp.cpu())
+                #         # plt.show()
 
                 if (batch_iter % 800) == 0:
                     print('Train Epoch: {} [{}/{} ({:.0f}%)] train loss: {:.3f}'.format(
@@ -352,7 +384,7 @@ def parse_args():
                         help='disables CUDA training')
     parser.add_argument('--seed', type=int, default=1, metavar='S',
                         help='random seed (default: 1)')
-    parser.add_argument('--log-interval', type=int, default=4000, metavar='N',
+    parser.add_argument('--log-interval', type=int, default=8000, metavar='N',
                         help='how many batches to wait before logging training status')
 
 
@@ -374,7 +406,10 @@ if __name__ == "__main__":
 
     # vd = VideoPairs("/home/gc28692/Projects/data/video_pairs",True,training=False,validation=True,patch_size=(1280,720),overlap_ratio=0)
     # model = ArtifactReduction()
-    # model.load_state_dict(torch.load("models/SSIM_SSIM_SGD_res2.pth")['model_state_dict'])
+    # # train_loader, val_loader, test_loader = load_video_pairs(1,1)
+    # model.load_state_dict(torch.load("models/L2_SSIM_SGD_res4.pth")['model_state_dict'])
+    # # scores = validate(model,val_loader,'cuda',[SSIM_metric()])
+    # # print(scores)
     # vd.visualize_sample(model)
     # exit()
     print("=================")
@@ -411,7 +446,7 @@ if __name__ == "__main__":
 
     # set optimizer
     if args.opt == "SGD":
-        opt = torch.optim.SGD(params=model.parameters(),lr=args.lr,momentum=0.0)
+        opt = torch.optim.SGD(params=model.parameters(),lr=args.lr,momentum=0.2)
     elif args.opt == "Adam":
         opt = torch.optim.Adam(params=model.parameters(),lr=args.lr)
 
