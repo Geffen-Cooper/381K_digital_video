@@ -118,7 +118,7 @@ class SSIM_metric(nn.Module):
             for comp,gt in zip(output,target):
                 for comp_f,gt_f in zip(comp,gt):
                     score += SSIM(comp_f,gt_f,self.window)
-            avg = score / (output.shape[0])
+            avg = score / (output.shape[1])
 
             # we want to maximize SSIM so use negative
             # of it to use as a loss that we minimize
@@ -320,9 +320,10 @@ def train(model,train_loader,val_loader,test_loader,device,loss_fn,optimizer,arg
     writer.add_scalar("Metric/val_SSIM", val_metric_SSIM, batch_iter)
     
 def validate(model, val_loader, device, loss_fns):
-    # set up the model and store metrics
-    model.eval()
-    model = model.to(device)
+    if model != None:
+        # set up the model and store metrics
+        model.eval()
+        model = model.to(device)
     val_metrics = torch.zeros(len(loss_fns))
     with torch.no_grad():
         i=0
@@ -350,7 +351,10 @@ def validate(model, val_loader, device, loss_fns):
                     ground_truth = target[:,:,depth_coord,:,:]
             
                 # forward, output is a single frame
-                output = model(frames)
+                if model != None:
+                    output = model(frames)
+                else:
+                    output = frames[:,:,2,:,:]
 
                 # get value for each metric
                 for k,loss_fn in enumerate(loss_fns):
@@ -404,14 +408,15 @@ if __name__ == "__main__":
     # vd.visualize_sample()
     # exit()
 
-    # vd = VideoPairs("/home/gc28692/Projects/data/video_pairs",True,training=False,validation=True,patch_size=(1280,720),overlap_ratio=0)
-    # model = ArtifactReduction()
-    # # train_loader, val_loader, test_loader = load_video_pairs(1,1)
-    # model.load_state_dict(torch.load("models/L2_SSIM_SGD_res4.pth")['model_state_dict'])
+    vd = VideoPairs("/home/gc28692/Projects/data/video_pairs",True,training=False,validation=False,testing=True,patch_size=(1280,720),overlap_ratio=0)
+    model = ArtifactReduction()
+    # train_loader, val_loader, test_loader = load_video_pairs(1,1)
+    model.load_state_dict(torch.load("models/Small_LR.pth")['model_state_dict'])
+    # print(validate(model,test_loader,'cuda',[PSNR_metric(),SSIM_metric()]))
     # # scores = validate(model,val_loader,'cuda',[SSIM_metric()])
     # # print(scores)
-    # vd.visualize_sample(model)
-    # exit()
+    vd.visualize_sample(model)
+    exit()
     print("=================")
     # get arguments
     args = parse_args()
