@@ -97,7 +97,7 @@ while True:
                 #     l1[i] = np.sum(np.abs(pred_px.astype(int)-last_rect_px.astype(int)))
                 #     if DEBUG_MODE:
                 #         cv2.imwrite("patch"+str(dir)+".png",pred_px)
-        
+        print(count)
         if np.min(l1) > 50000:
             closest = np.argmin(l1)
             col = (closest % (SEARCH_SIZE+SEARCH_SIZE+1))
