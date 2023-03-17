@@ -90,7 +90,7 @@ while True:
     img = cv2.flip(img,1)
     curr_rect_px = img[start_point[1]:end_point[1],start_point[0]:end_point[0]]
     
-    eff = False
+    eff = True
 
     # === Rectangle tracking update ===
     # update position
@@ -110,7 +110,7 @@ while True:
         # keep running the search as long as in the search space
         #print("start")
         while y_off >= -SEARCH_SIZE and y_off <= SEARCH_SIZE and x_off >= -SEARCH_SIZE and x_off <= SEARCH_SIZE:
-            print(f"------------iteration: {iteration}")
+            # print(f"------------iteration: {iteration}")
             # print(search_locs)
             # iterate over the latest diamond points (some already computed)
             for i,coord in enumerate(search_locs):
@@ -126,8 +126,8 @@ while True:
                         l1[i] = np.sum(np.abs(pred_px.astype(int)-last_rect_px.astype(int)))
             last_dir = next_dir
             next_dir = np.argmin(l1)
-            print(l1)
-            print(f"last: {last_dir}, next: {next_dir}")
+            # print(l1)
+            # print(f"last: {last_dir}, next: {next_dir}")
             #rint(f"x_off: {x_off}, y_off: {y_off}")
             # need to handle how to update the l1 for next dir, also need to break if next dir is center after one more iter
             # update current offset
@@ -137,6 +137,8 @@ while True:
             # update next search locations
             if eff and next_dir != 0:
                 search_locs = locs[next_dir] # this seems to be the issue
+            elif next_dir == 0:
+                search_locs = all_search_locs
 
             # termination case, if center is best
             if last_dir == 0:
@@ -149,9 +151,9 @@ while True:
                     for i,shift in enumerate(shifts[next_dir]):
                         l1[shift[1]] = l1[shift[0]]
             iteration += 1
-        print(f"best match: ({y_off},{x_off}) after {count} differences")      
+        # print(f"best match: ({y_off},{x_off}) after {count} differences")      
         # exit()
-        # print(count)
+        print(count)
         # closest = np.argmin(l1)
         # col = (closest % (SEARCH_SIZE+SEARCH_SIZE+1))
         # row = (closest // (SEARCH_SIZE+SEARCH_SIZE+1))
