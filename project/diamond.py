@@ -43,7 +43,7 @@ if not ret:
 img = cv2.flip(img,1)
 last_rect_px = img[start_point[1]:end_point[1],start_point[0]:end_point[0]]
 
-SEARCH_SIZE = 50
+SEARCH_SIZE = 125
 sx, sy = np.meshgrid(np.arange(-SEARCH_SIZE,SEARCH_SIZE+1),np.arange(-SEARCH_SIZE,SEARCH_SIZE+1))
 
 x_off = 0
