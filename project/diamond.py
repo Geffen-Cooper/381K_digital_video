@@ -43,7 +43,7 @@ if not ret:
 img = cv2.flip(img,1)
 last_rect_px = img[start_point[1]:end_point[1],start_point[0]:end_point[0]]
 
-SEARCH_SIZE = 125
+SEARCH_SIZE = 62
 sx, sy = np.meshgrid(np.arange(-SEARCH_SIZE,SEARCH_SIZE+1),np.arange(-SEARCH_SIZE,SEARCH_SIZE+1))
 
 x_off = 0
@@ -79,6 +79,12 @@ bl_shift = np.array([[0,4],[8,0],[2,3],[1,2],[6,5],[7,6]])
 bl_new = np.array([7,8,1])
 shifts = [None,l_shift,tl_shift,t_shift,tr_shift,r_shift,br_shift,b_shift,bl_shift]
 news = [None,l_new,tl_new,t_new,tr_new,r_new,br_new,b_new,bl_new]
+
+running_l1 = 0
+max_l1 = 0
+alpha = 0.95
+first_frame = True
+reset = False
 # start loop
 while True:
     # try to read a frame
@@ -94,12 +100,7 @@ while True:
 
     # === Rectangle tracking update ===
     # update position
-    first_frame = True
     if start_tracking:
-        if first_frame == True:
-            first_frame = False
-            first_frame = last_rect_px
-        # l1 = np.ones(9)*1e9
         l1 = np.ones(9)*1e9
         count = 0
         iteration = 0
@@ -126,6 +127,7 @@ while True:
                         l1[i] = np.sum(np.abs(pred_px.astype(int)-last_rect_px.astype(int)))
             last_dir = next_dir
             next_dir = np.argmin(l1)
+
             # print(l1)
             # print(f"last: {last_dir}, next: {next_dir}")
             #rint(f"x_off: {x_off}, y_off: {y_off}")
@@ -153,7 +155,17 @@ while True:
             iteration += 1
         # print(f"best match: ({y_off},{x_off}) after {count} differences")      
         # exit()
-        print(count)
+        if first_frame == True:
+            first_frame = False
+            running_l1 = np.min(l1)
+            max_l1 = running_l1
+        else:
+            running_l1 = running_l1*alpha + np.min(l1)*(1-alpha)
+            if np.min(l1) > max_l1:
+                max_l1 = np.min(l1)
+        if max_l1 > 200000:
+            reset = True
+        print(count,int(running_l1),int(max_l1))
         # closest = np.argmin(l1)
         # col = (closest % (SEARCH_SIZE+SEARCH_SIZE+1))
         # row = (closest // (SEARCH_SIZE+SEARCH_SIZE+1))
@@ -187,11 +199,12 @@ while True:
     # cv2.imwrite("last.png",last_rect_px)
     
     overlay = img.copy()
+    img_disp = img.copy()
     cv2.rectangle(overlay, start_point-SEARCH_SIZE, end_point+SEARCH_SIZE, (0,0,255), -1)
-    img = cv2.addWeighted(overlay, 0.2, img, 1 - 0.2, 0)
-    cv2.putText(img,str(x_off)+","+str(y_off),start_point-10,font, 1, (100, 255, 0), 1, cv2.LINE_AA)
-    cv2.rectangle(img, (start_point[0],start_point[1]), end_point, (0,0,255), 4)
-    cv2.arrowedLine(img, (start_point[0]-x_off,start_point[1]-y_off), start_point,(100, 255, 0), 3)
+    img_disp = cv2.addWeighted(overlay, 0.2, img_disp, 1 - 0.2, 0)
+    cv2.putText(img_disp,str(x_off)+","+str(y_off),start_point-10,font, 1, (100, 255, 0), 1, cv2.LINE_AA)
+    cv2.rectangle(img_disp, (start_point[0],start_point[1]), end_point, (0,0,255), 4)
+    cv2.arrowedLine(img_disp, (start_point[0]-x_off,start_point[1]-y_off), start_point,(100, 255, 0), 3)
   
     # calculate the fps
     frame_count += 1
@@ -203,9 +216,20 @@ while True:
         frame_count = 0
 
     # img, text, location of BLC, font, size, color, thickness, linetype
-    cv2.putText(img, fps+", "+str(int(FRAME_W))+"x"+str(int(FRAME_H)), (7, 30), font, 1, (100, 255, 0), 1, cv2.LINE_AA)
+    cv2.putText(img_disp, fps+", "+str(int(FRAME_W))+"x"+str(int(FRAME_H)), (7, 30), font, 1, (100, 255, 0), 1, cv2.LINE_AA)
     
-    cv2.imshow('window',img)
+    cv2.imshow('window',img_disp)
+
+    if reset == True:
+        print("\n\n========== LOST HAND ==========\n\n")
+        start_tracking = False
+        running_l1 = 0
+        max_l1 = 0
+        alpha = 0.95
+        first_frame = True
+        reset = False
+        cv2.imwrite("last_frame.png",last_rect_px)
+        cv2.imwrite("current_frame.png",img)
 
     # get key
     k = cv2.waitKey(1)

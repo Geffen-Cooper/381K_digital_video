@@ -103,7 +103,7 @@ while True:
         break
     elif k == ord('r'):
         # first save, then generate new
-        cv2.imwrite(str(start_point[0]-outer_start_point[0])+"_"+str(start_point[1]-outer_start_point[1])+"_"+\
+        cv2.imwrite("palm_imgs/"+str(start_point[0]-outer_start_point[0])+"_"+str(start_point[1]-outer_start_point[1])+"_"+\
                     str(R_W)+"_"+str(R_H)+"-"+str(time.time())+".png",\
                     img[outer_start_point[1]:outer_end_point[1],outer_start_point[0]:outer_end_point[0]])
 

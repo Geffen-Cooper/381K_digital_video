@@ -3,10 +3,10 @@ import time
 import numpy as np
 import os
 
-files = os.listdir()[:-2]
+files = os.listdir("palm_imgs")[:-2]
 
 for f in files:
-    img = cv2.imread(f)
+    img = cv2.imread(os.path.join("palm_imgs",f))
     params = f.split("_")
 
     x,y,w,h = int(params[0]),int(params[1]),int(params[2]),int(params[3].split("-")[0])
