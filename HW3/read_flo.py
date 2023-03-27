@@ -147,6 +147,4 @@ if __name__ == "__main__":
 
 	# viz_flo(flo_field,img1,img2)
 	ff = estimate_flow(img1,img2)
-	print(ff)
-	print(ff.shape)
-	viz_flo(ff,img1,img2)
+	viz_flo(ff,img1,img2,sample=1)
