@@ -22,28 +22,28 @@ def read(file):
 
 	return flow
 
-def viz_flo(flo_field,img1,img2,sample=16):
-	for row in range(0,flo_field.shape[0],sample):
-		for col in range(0,flo_field.shape[1],sample):
+def viz_flo(flo_field,img1,img2,sample_img=16,sample_field=16,color=(255, 255, 255)):
+	for row in range(0,flo_field.shape[0],sample_field):
+		for col in range(0,flo_field.shape[1],sample_field):
 			if flo_field[row,col,0] > 1e9:
 				w = 0
 				h = 0
 			else:
 				w = int(flo_field[row,col,0])
 				h = int(flo_field[row,col,1])
-			start_point = (col, row) 
-			col_new = col + w
-			row_new = row + h
+			start_point = (col*sample_img//sample_field, row*sample_img//sample_field) 
+			col_new = col*sample_img//sample_field + w
+			row_new = row*sample_img//sample_field + h
+			
 			if col_new < 0:
 				col_new = 0
-			if col_new > img1.shape[1]:
+			elif col_new > img1.shape[1]:
 				col_new = img1.shape[1]
 			if row_new < 0:
 				row_new = 0
-			if row_new > img1.shape[0]:
+			elif row_new > img1.shape[0]:
 				row_new = img1.shape[0]
 			end_point = (col_new, row_new) 
-			color = (255, 255, 255) 
 			thickness = 1
 
 			img2 = cv2.arrowedLine(img2, start_point, end_point, color, thickness) 
@@ -60,6 +60,8 @@ def viz_flo(flo_field,img1,img2,sample=16):
 		# quit when click 'q' on keyboard
 		if cv2.waitKey(1000) & 0xFF == ord('q'):
 			break
+
+	return img2
 
 # estimate the flow
 def estimate_flow(img1,img2,method="brute_force",block_dim=16,search_dim=48):
@@ -107,14 +109,14 @@ def estimate_flow(img1,img2,method="brute_force",block_dim=16,search_dim=48):
 			
 			# now we get the index of the best matching block
 			closest = np.argmin(l1)
-			row_num = (closest % (search_dim+1))
-			col_num = (closest // (search_dim+1))
+			row_num = (closest // (search_dim+1))
+			col_num = (closest % (search_dim+1))
 
 			# convert to relative coordinates (e.g. (0,0) --> (-24,-24))
 			y_rel = row_num-search_dim//2
 			x_rel = col_num-search_dim//2
 
-			print(x_rel,y_rel)
+			# print(x_rel,y_rel)
 
 			flo_estimate[row_i,col_i,0] = x_rel
 			flo_estimate[row_i,col_i,1] = y_rel
@@ -145,6 +147,14 @@ if __name__ == "__main__":
 	img1 = cv2.imread(img1_path)
 	img2 = cv2.imread(img2_path)
 
-	# viz_flo(flo_field,img1,img2)
+	flow_img_gt = viz_flo(flo_field,img1,img2.copy(),color=(0,255,0))
+	cv2.imwrite("gt.png",flow_img_gt)
+
 	ff = estimate_flow(img1,img2)
-	viz_flo(ff,img1,img2,sample=1)
+	flow_img_est = viz_flo(ff,img1,img2,sample_img=16,sample_field=1)
+	cv2.imwrite("estimate.png",flow_img_est)
+
+	img = cv2.addWeighted(flow_img_gt, 0.5, flow_img_est, 1 - 0.5, 0)
+	cv2.imwrite("overlayed.png",img)
+
+	print(np.mean(np.square(ff - flo_field[::16,::16])))
