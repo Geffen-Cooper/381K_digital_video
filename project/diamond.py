@@ -43,7 +43,7 @@ if not ret:
 img = cv2.flip(img,1)
 last_rect_px = img[start_point[1]:end_point[1],start_point[0]:end_point[0]]
 
-SEARCH_SIZE = 62
+SEARCH_SIZE = 150
 sx, sy = np.meshgrid(np.arange(-SEARCH_SIZE,SEARCH_SIZE+1),np.arange(-SEARCH_SIZE,SEARCH_SIZE+1))
 
 x_off = 0
@@ -61,6 +61,8 @@ b_search_locs = np.array([[0,2],[1,1],[2,0],[1,-1],[0,-2]])
 bl_search_locs = np.array([[2,0],[1,-1],[0,-2]])
 locs = [c_search_locs,l_search_locs,tl_search_locs,t_search_locs,tr_search_locs,r_search_locs,br_search_locs,b_search_locs,bl_search_locs]
 
+c_shift = None
+c_new = np.array([1,2,3,4])
 l_shift = np.array([[0,5],[1,0],[2,4],[8,6]])
 l_new = np.array([7,8,1,2,3])
 tl_shift = np.array([[4,5],[3,4],[0,6],[2,0],[8,7],[1,8]])
@@ -77,14 +79,15 @@ b_shift = np.array([[0,3],[8,2],[7,0],[6,4]])
 b_new = np.array([5,6,7,8,1])
 bl_shift = np.array([[0,4],[8,0],[2,3],[1,2],[6,5],[7,6]])
 bl_new = np.array([7,8,1])
-shifts = [None,l_shift,tl_shift,t_shift,tr_shift,r_shift,br_shift,b_shift,bl_shift]
-news = [None,l_new,tl_new,t_new,tr_new,r_new,br_new,b_new,bl_new]
+shifts = [c_shift,l_shift,tl_shift,t_shift,tr_shift,r_shift,br_shift,b_shift,bl_shift]
+news = [c_new,l_new,tl_new,t_new,tr_new,r_new,br_new,b_new,bl_new]
 
 running_l1 = 0
 max_l1 = 0
 alpha = 0.95
 first_frame = True
 reset = False
+first_rect = None
 # start loop
 while True:
     # try to read a frame
@@ -95,8 +98,6 @@ while True:
     # flip horizontally
     img = cv2.flip(img,1)
     curr_rect_px = img[start_point[1]:end_point[1],start_point[0]:end_point[0]]
-    
-    eff = True
 
     # === Rectangle tracking update ===
     # update position
@@ -121,8 +122,10 @@ while True:
                     print("Hitting Boundary")
                 else:
                     pred_px = img[start_point[1]+y_off+coord[0]:end_point[1]+y_off+coord[0],start_point[0]+x_off+coord[1]:end_point[0]+x_off+coord[1]]
-                    if eff and next_dir > 0:
+                    if next_dir >= 0:
                         l1[news[next_dir][i]] = np.sum(np.abs(pred_px.astype(int)-last_rect_px.astype(int)))
+                        if next_dir == 0:
+                            l1[5:] = 1e9
                     else:
                         l1[i] = np.sum(np.abs(pred_px.astype(int)-last_rect_px.astype(int)))
             last_dir = next_dir
@@ -130,17 +133,21 @@ while True:
 
             # print(l1)
             # print(f"last: {last_dir}, next: {next_dir}")
-            #rint(f"x_off: {x_off}, y_off: {y_off}")
+            # print(f"x_off: {x_off}, y_off: {y_off}")
             # need to handle how to update the l1 for next dir, also need to break if next dir is center after one more iter
+           
             # update current offset
-            x_off += all_search_locs[next_dir][1]
-            y_off += all_search_locs[next_dir][0]
+            if last_dir == 0: # we handle the center case differently since the inner diamond is different
+                if next_dir != 0: # only add an offset if not in the center
+                    print(next_dir)
+                    x_off += c_search_locs[next_dir-1][1]
+                    y_off += c_search_locs[next_dir-1][0] 
+            else:
+                x_off += all_search_locs[next_dir][1]
+                y_off += all_search_locs[next_dir][0]
 
             # update next search locations
-            if eff and next_dir != 0:
-                search_locs = locs[next_dir] # this seems to be the issue
-            elif next_dir == 0:
-                search_locs = all_search_locs
+            search_locs = locs[next_dir]
 
             # termination case, if center is best
             if last_dir == 0:
@@ -149,7 +156,7 @@ while True:
             # other wise need to fill in precomputed distances
             else:
                 # save differences we can reuse
-                if eff and next_dir != 0:
+                if next_dir != 0:
                     for i,shift in enumerate(shifts[next_dir]):
                         l1[shift[1]] = l1[shift[0]]
             iteration += 1
@@ -159,13 +166,15 @@ while True:
             first_frame = False
             running_l1 = np.min(l1)
             max_l1 = running_l1
+            first_rect = last_rect_px
         else:
             running_l1 = running_l1*alpha + np.min(l1)*(1-alpha)
             if np.min(l1) > max_l1:
                 max_l1 = np.min(l1)
         if max_l1 > 200000:
             reset = True
-        print(count,int(running_l1),int(max_l1))
+        print(f"best match: ({y_off},{x_off}) after {count} diffs, curr diff: {np.min(l1)}, running diff: {int(running_l1)}, max diff: {int(max_l1)}") 
+        # print(count,int(running_l1),int(max_l1))
         # closest = np.argmin(l1)
         # col = (closest % (SEARCH_SIZE+SEARCH_SIZE+1))
         # row = (closest // (SEARCH_SIZE+SEARCH_SIZE+1))
@@ -222,14 +231,15 @@ while True:
 
     if reset == True:
         print("\n\n========== LOST HAND ==========\n\n")
-        start_tracking = False
+        # start_tracking = False
+        last_rect_px = first_rect
         running_l1 = 0
         max_l1 = 0
         alpha = 0.95
-        first_frame = True
+        # first_frame = True
         reset = False
-        cv2.imwrite("last_frame.png",last_rect_px)
-        cv2.imwrite("current_frame.png",img)
+        # cv2.imwrite("last_frame.png",last_rect_px)
+        # cv2.imwrite("current_frame.png",img)
 
     # get key
     k = cv2.waitKey(1)
