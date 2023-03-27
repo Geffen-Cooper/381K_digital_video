@@ -88,6 +88,8 @@ alpha = 0.95
 first_frame = True
 reset = False
 first_rect = None
+box_color = (0,255,0)
+
 # start loop
 while True:
     # try to read a frame
@@ -173,6 +175,9 @@ while True:
                 max_l1 = np.min(l1)
         if max_l1 > 200000:
             reset = True
+            box_color = (0,0,255)
+        else:
+            box_color = (0,255,0)
         print(f"best match: ({y_off},{x_off}) after {count} diffs, curr diff: {np.min(l1)}, running diff: {int(running_l1)}, max diff: {int(max_l1)}") 
         # print(count,int(running_l1),int(max_l1))
         # closest = np.argmin(l1)
@@ -209,10 +214,10 @@ while True:
     
     overlay = img.copy()
     img_disp = img.copy()
-    cv2.rectangle(overlay, start_point-SEARCH_SIZE, end_point+SEARCH_SIZE, (0,0,255), -1)
+    cv2.rectangle(overlay, start_point-SEARCH_SIZE, end_point+SEARCH_SIZE, box_color, -1)
     img_disp = cv2.addWeighted(overlay, 0.2, img_disp, 1 - 0.2, 0)
     cv2.putText(img_disp,str(x_off)+","+str(y_off),start_point-10,font, 1, (100, 255, 0), 1, cv2.LINE_AA)
-    cv2.rectangle(img_disp, (start_point[0],start_point[1]), end_point, (0,0,255), 4)
+    cv2.rectangle(img_disp, (start_point[0],start_point[1]), end_point, box_color, 4)
     cv2.arrowedLine(img_disp, (start_point[0]-x_off,start_point[1]-y_off), start_point,(100, 255, 0), 3)
   
     # calculate the fps
