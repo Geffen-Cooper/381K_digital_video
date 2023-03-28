@@ -4,8 +4,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 # init rect
-RECT_W = 100
-RECT_H = 100
+RECT_W = 110
+RECT_H = 110
 SEARCH_SIZE = 150
 
 # initialize the capture object
@@ -125,11 +125,11 @@ while True:
                 else:
                     pred_px = img[start_point[1]+y_off+coord[0]:end_point[1]+y_off+coord[0],start_point[0]+x_off+coord[1]:end_point[0]+x_off+coord[1]]
                     if next_dir >= 0:
-                        l1[news[next_dir][i]] = np.sum(np.abs(pred_px.astype(int)-last_rect_px.astype(int)))
+                        l1[news[next_dir][i]] = np.mean(np.abs(pred_px.astype(int)-last_rect_px.astype(int)))
                         if next_dir == 0:
                             l1[5:] = 1e9
                     else:
-                        l1[i] = np.sum(np.abs(pred_px.astype(int)-last_rect_px.astype(int)))
+                        l1[i] = np.mean(np.abs(pred_px.astype(int)-last_rect_px.astype(int)))
             last_dir = next_dir
             next_dir = np.argmin(l1)
 
@@ -169,7 +169,9 @@ while True:
         else:
             running_l1 = running_l1*alpha + np.min(l1)*(1-alpha)
             running_count = running_count*alpha + count*(1-alpha)
-        if np.min(l1) > 350000:
+            if np.min(l1) > max_l1:
+                max_l1 = np.min(l1)
+        if np.min(l1) > 13:
             box_color = (0,0,255)
         else:
             box_color = (0,150,0)
@@ -224,8 +226,8 @@ while True:
     
     cv2.putText(img_disp, "Avg. Error:", (300-40, 23), font, 0.5, (0, 0, 0), 1, cv2.LINE_AA)
     cv2.rectangle(img_disp,(300+50,8),(620,30),(0,0,0),1)
-    cv2.rectangle(img_disp,(304+50,12),(304+50+int((615-305-50)*running_l1/2100000),26),box_color,-1)
-    cv2.rectangle(img_disp,(300+50,8),(305+50+int((615-305-50)*350000/2100000),30),(0,0,0),1)
+    cv2.rectangle(img_disp,(304+50,12),(304+50+int((615-305-50)*running_l1/100),26),box_color,-1)
+    cv2.rectangle(img_disp,(300+50,8),(305+50+int((615-305-50)*10/100),30),(0,0,0),1)
 
     cv2.putText(img_disp, "Avg. Diffs: "+str(round(running_count,1)), (300-90, 23+32), font, 0.5, (0, 0, 0), 1, cv2.LINE_AA)
     cv2.rectangle(img_disp,(300+50,8+30),(620,30+30),(0,0,0),1)
