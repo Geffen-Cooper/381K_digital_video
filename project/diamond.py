@@ -3,11 +3,10 @@ import time
 import numpy as np
 import matplotlib.pyplot as plt
 
-DEBUG_MODE = False
-
 # init rect
 RECT_W = 100
 RECT_H = 100
+SEARCH_SIZE = 150
 
 # initialize the capture object
 cap = cv2.VideoCapture(0)
@@ -43,7 +42,7 @@ if not ret:
 img = cv2.flip(img,1)
 last_rect_px = img[start_point[1]:end_point[1],start_point[0]:end_point[0]]
 
-SEARCH_SIZE = 150
+
 sx, sy = np.meshgrid(np.arange(-SEARCH_SIZE,SEARCH_SIZE+1),np.arange(-SEARCH_SIZE,SEARCH_SIZE+1))
 
 x_off = 0
@@ -83,12 +82,15 @@ shifts = [c_shift,l_shift,tl_shift,t_shift,tr_shift,r_shift,br_shift,b_shift,bl_
 news = [c_new,l_new,tl_new,t_new,tr_new,r_new,br_new,b_new,bl_new]
 
 running_l1 = 0
+running_count = 0
 max_l1 = 0
-alpha = 0.95
+alpha = 0.75
 first_frame = True
 reset = False
 first_rect = None
-box_color = (0,255,0)
+box_color = (0,150,0)
+
+
 
 # start loop
 while True:
@@ -99,7 +101,6 @@ while True:
 
     # flip horizontally
     img = cv2.flip(img,1)
-    curr_rect_px = img[start_point[1]:end_point[1],start_point[0]:end_point[0]]
 
     # === Rectangle tracking update ===
     # update position
@@ -111,11 +112,10 @@ while True:
         y_off = 0
         search_locs = all_search_locs
         next_dir = -1
+
         # keep running the search as long as in the search space
-        #print("start")
         while y_off >= -SEARCH_SIZE and y_off <= SEARCH_SIZE and x_off >= -SEARCH_SIZE and x_off <= SEARCH_SIZE:
-            # print(f"------------iteration: {iteration}")
-            # print(search_locs)
+            
             # iterate over the latest diamond points (some already computed)
             for i,coord in enumerate(search_locs):
                 count += 1
@@ -133,11 +133,7 @@ while True:
             last_dir = next_dir
             next_dir = np.argmin(l1)
 
-            # print(l1)
-            # print(f"last: {last_dir}, next: {next_dir}")
-            # print(f"x_off: {x_off}, y_off: {y_off}")
-            # need to handle how to update the l1 for next dir, also need to break if next dir is center after one more iter
-           
+            
             # update current offset
             if last_dir == 0: # we handle the center case differently since the inner diamond is different
                 if next_dir != 0: # only add an offset if not in the center
@@ -162,38 +158,30 @@ while True:
                     for i,shift in enumerate(shifts[next_dir]):
                         l1[shift[1]] = l1[shift[0]]
             iteration += 1
-        # print(f"best match: ({y_off},{x_off}) after {count} differences")      
-        # exit()
+        
+        # store some stats
         if first_frame == True:
             first_frame = False
             running_l1 = np.min(l1)
+            running_count = count
             max_l1 = running_l1
             first_rect = last_rect_px
         else:
             running_l1 = running_l1*alpha + np.min(l1)*(1-alpha)
-            if np.min(l1) > max_l1:
-                max_l1 = np.min(l1)
-        if max_l1 > 200000:
-            reset = True
+            running_count = running_count*alpha + count*(1-alpha)
+        if np.min(l1) > 350000:
             box_color = (0,0,255)
         else:
-            box_color = (0,255,0)
+            box_color = (0,150,0)
         print(f"best match: ({y_off},{x_off}) after {count} diffs, curr diff: {np.min(l1)}, running diff: {int(running_l1)}, max diff: {int(max_l1)}") 
-        # print(count,int(running_l1),int(max_l1))
-        # closest = np.argmin(l1)
-        # col = (closest % (SEARCH_SIZE+SEARCH_SIZE+1))
-        # row = (closest // (SEARCH_SIZE+SEARCH_SIZE+1))
-        # y_rel = row-SEARCH_SIZE
-        # x_rel = col-SEARCH_SIZE
-        # print(row,col)
-        # print(dirs[closest])
+       
+        # update the position after tracking
         start_point[0] += x_off
         start_point[1] += y_off
         end_point[0] += x_off
         end_point[1] += y_off
-    else:
-        min_noise = np.sum(np.abs(curr_rect_px-last_rect_px))
 
+    # after tracking done, display results
     
     # check collision
     if start_point[0] <= 0: # left
@@ -210,41 +198,39 @@ while True:
         start_point[1] = FRAME_H - RECT_H
    
     last_rect_px = img[start_point[1]:end_point[1],start_point[0]:end_point[0]]
+    if not first_frame:
+        last_rect_px = first_rect
     # cv2.imwrite("last.png",last_rect_px)
     
     overlay = img.copy()
     img_disp = img.copy()
     cv2.rectangle(overlay, start_point-SEARCH_SIZE, end_point+SEARCH_SIZE, box_color, -1)
-    img_disp = cv2.addWeighted(overlay, 0.2, img_disp, 1 - 0.2, 0)
-    cv2.putText(img_disp,str(x_off)+","+str(y_off),start_point-10,font, 1, (100, 255, 0), 1, cv2.LINE_AA)
+    img_disp = cv2.addWeighted(overlay, 0.1, img_disp, 1 - 0.1, 0)
+    cv2.putText(img_disp,str(x_off)+","+str(y_off),start_point-10,font, 1, (0, 0, 0), 1, cv2.LINE_AA)
     cv2.rectangle(img_disp, (start_point[0],start_point[1]), end_point, box_color, 4)
-    cv2.arrowedLine(img_disp, (start_point[0]-x_off,start_point[1]-y_off), start_point,(100, 255, 0), 3)
+    cv2.arrowedLine(img_disp, (start_point[0]-x_off,start_point[1]-y_off), start_point,(0, 0, 0), 3)
   
     # calculate the fps
     frame_count += 1
     curr_frame_time = time.time()
     diff = curr_frame_time - last_frame_time
     if diff > 1:
-        fps = str(round(frame_count/(diff),2))
+        fps = str(round(frame_count/(diff),1))
         last_frame_time = curr_frame_time
         frame_count = 0
 
     # img, text, location of BLC, font, size, color, thickness, linetype
-    cv2.putText(img_disp, fps+", "+str(int(FRAME_W))+"x"+str(int(FRAME_H)), (7, 30), font, 1, (100, 255, 0), 1, cv2.LINE_AA)
+    cv2.putText(img_disp, fps+", "+str(int(FRAME_W))+"x"+str(int(FRAME_H)), (7, 30), font, 1, (0, 0, 0), 1, cv2.LINE_AA)
     
-    cv2.imshow('window',img_disp)
+    cv2.putText(img_disp, "Avg. Error:", (300-40, 23), font, 0.5, (0, 0, 0), 1, cv2.LINE_AA)
+    cv2.rectangle(img_disp,(300+50,8),(620,30),(0,0,0),1)
+    cv2.rectangle(img_disp,(304+50,12),(304+50+int((615-305)*running_l1/2100000),26),box_color,-1)
+    cv2.rectangle(img_disp,(300+50,8),(305+50+int((615-305)*350000/2100000),30),(0,0,0),1)
 
-    if reset == True:
-        print("\n\n========== LOST HAND ==========\n\n")
-        # start_tracking = False
-        last_rect_px = first_rect
-        running_l1 = 0
-        max_l1 = 0
-        alpha = 0.95
-        # first_frame = True
-        reset = False
-        # cv2.imwrite("last_frame.png",last_rect_px)
-        # cv2.imwrite("current_frame.png",img)
+    cv2.putText(img_disp, "Avg. Diffs: "+str(round(running_count,1)), (300-90, 23+32), font, 0.5, (0, 0, 0), 1, cv2.LINE_AA)
+    cv2.rectangle(img_disp,(300+50,8+30),(620,30+30),(0,0,0),1)
+    cv2.rectangle(img_disp,(304+50,12+30),(304+50+int((615-305)*running_count/500),26+30),(0,0,0),-1)
+    cv2.imshow('window',img_disp)
 
     # get key
     k = cv2.waitKey(1)
