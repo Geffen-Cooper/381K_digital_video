@@ -14,7 +14,7 @@ FRAME_W = cap.get(cv2.CAP_PROP_FRAME_WIDTH)
 FRAME_H = cap.get(cv2.CAP_PROP_FRAME_HEIGHT) 
 
 # create a window
-cv2.namedWindow("window", cv2.WINDOW_NORMAL)
+cv2.namedWindow("("+str(int(FRAME_W))+"x"+str(int(FRAME_H))+")", cv2.WINDOW_NORMAL)
 
 # measure FPS
 last_frame_time = 0
@@ -220,17 +220,17 @@ while True:
         frame_count = 0
 
     # img, text, location of BLC, font, size, color, thickness, linetype
-    cv2.putText(img_disp, fps+", "+str(int(FRAME_W))+"x"+str(int(FRAME_H)), (7, 30), font, 1, (0, 0, 0), 1, cv2.LINE_AA)
+    cv2.putText(img_disp, "FPS: " +fps, (7, 30), font, 0.7, (0, 0, 0), 1, cv2.LINE_AA)
     
     cv2.putText(img_disp, "Avg. Error:", (300-40, 23), font, 0.5, (0, 0, 0), 1, cv2.LINE_AA)
     cv2.rectangle(img_disp,(300+50,8),(620,30),(0,0,0),1)
-    cv2.rectangle(img_disp,(304+50,12),(304+50+int((615-305)*running_l1/2100000),26),box_color,-1)
-    cv2.rectangle(img_disp,(300+50,8),(305+50+int((615-305)*350000/2100000),30),(0,0,0),1)
+    cv2.rectangle(img_disp,(304+50,12),(304+50+int((615-305-50)*running_l1/2100000),26),box_color,-1)
+    cv2.rectangle(img_disp,(300+50,8),(305+50+int((615-305-50)*350000/2100000),30),(0,0,0),1)
 
     cv2.putText(img_disp, "Avg. Diffs: "+str(round(running_count,1)), (300-90, 23+32), font, 0.5, (0, 0, 0), 1, cv2.LINE_AA)
     cv2.rectangle(img_disp,(300+50,8+30),(620,30+30),(0,0,0),1)
     cv2.rectangle(img_disp,(304+50,12+30),(304+50+int((615-305)*running_count/500),26+30),(0,0,0),-1)
-    cv2.imshow('window',img_disp)
+    cv2.imshow("("+str(int(FRAME_W))+"x"+str(int(FRAME_H))+")",img_disp)
 
     # get key
     k = cv2.waitKey(1)
