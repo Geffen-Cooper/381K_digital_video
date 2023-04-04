@@ -16,30 +16,31 @@ def read_frame(video_file,w,h):
 
 def normalize(luminance,N,blur=None):
 	if blur != None:
-		luminance = cv2.GaussianBlur(luminance,(5,5),sigmaX=blur,sigmaY=blur)
+		luminance = cv2.GaussianBlur(luminance,(9,9),sigmaX=blur,sigmaY=blur)
 
 	# get the NxN blocks
 	h,w = luminance.shape[0],luminance.shape[1]
 
-	normalized = np.log(luminance.copy().astype(float))
+	normalized = luminance.copy().astype(float)
 	for row_i,row in enumerate(tqdm(range(h))):
 		for col_i,col in enumerate(range(w)):
-			block = np.zeros((N,N)).astype(float)
+			# block = np.zeros((N,N)).astype(float)
 			# get the blocks and normalize the center pixel
 			patch_tlx = col - N//2 if col - N//2 > 0 else 0
 			patch_tly = row - N//2 if row - N//2 > 0 else 0
 			patch_brx = col + N//2 + 1 if col + N//2 + 1 <= w else w
 			patch_bry = row + N//2 + 1 if row + N//2 + 1 <= h else h
 
-			block_tlx = 0 if col - N//2 > 0 else N - (patch_brx-patch_tlx)
-			block_tly = 0 if row - N//2 > 0 else N - (patch_bry-patch_tly)
-			block_brx = N if col + N//2 + 1 <= w else (patch_brx-patch_tlx)
-			block_bry = N if row + N//2 + 1 <= h else (patch_bry-patch_tly)
+			# block_tlx = 0 if col - N//2 > 0 else N - (patch_brx-patch_tlx)
+			# block_tly = 0 if row - N//2 > 0 else N - (patch_bry-patch_tly)
+			# block_brx = N if col + N//2 + 1 <= w else (patch_brx-patch_tlx)
+			# block_bry = N if row + N//2 + 1 <= h else (patch_bry-patch_tly)
 
 			# print(f"patch -- tlx:{patch_tlx},tly:{patch_tly},brx:{patch_brx},bry:{patch_bry}")
 			# print(f"block -- tlx:{block_tlx},tly:{block_tly},brx:{block_brx},bry:{block_bry}")
-			block[block_tly:block_bry,block_tlx:block_brx] = luminance[patch_tly:patch_bry,patch_tlx:patch_brx]
-			normalized[row,col] = (luminance[row,col]-block.mean())/(block.std()+1e-3)
+			# block[block_tly:block_bry,block_tlx:block_brx] = luminance[patch_tly:patch_bry,patch_tlx:patch_brx]
+			block = luminance[patch_tly:patch_bry,patch_tlx:patch_brx]
+			normalized[row,col] = (luminance[row,col]-np.mean(block))/(np.std(block)+1e-3)
 	return luminance,normalized
 
 def histogram(img,num_bins):
@@ -67,14 +68,11 @@ frame = read_frame("Jockey_1920x1080_120fps_420_8bit_YUV.yuv",1920,1080)
 
 for sigma in sigmas:
 	# do divisive normalization
-	luminance,normalized = normalize(frame,5,blur=sigma)
+	luminance,normalized = normalize(frame,9,blur=sigma)
 	edges,centers,counts = histogram(normalized,201)
 
 	# plot histogram
 	# plt.bar(centers,counts,width=0.05)
-	# center_l = ["-3","-2","-1","0","1","2","3"]
-	# centers = [-3,-2,-1,0,1,2,3]
-	# plt.xticks(centers,center_l)
 	# plt.savefig("hist_"+str(sigma)+".png")
 	# plt.show()
 	plt.hist(normalized.flatten(),201)
