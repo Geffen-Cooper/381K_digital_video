@@ -78,8 +78,8 @@ blank = np.zeros((240,320,3),dtype=np.uint8)
 seq_idx = 0
 collected_first_item = False
 
-files_collected = []
-
+files_collected = [os.listdir("data/class_"+str(i)) for i in range(len(os.listdir("data")))]
+print(files_collected)
 # start loop
 while True:
     # try to read a frame
@@ -100,7 +100,7 @@ while True:
     if results.multi_hand_landmarks:
         if hand_in_frame == False:
             hand_in_frame = True
-            print("Hand Entered Frame===========")
+            print("\nHand Entered Frame===========")
             lms_x = ["lmx"+str(i) for i in range(21)]
             lms_y = ["lmy"+str(i) for i in range(21)]
             lms_z = ["lmz"+str(i) for i in range(21)]
@@ -142,13 +142,14 @@ while True:
             count = 0
             continue
     
-        fn = "data/class_"+str(class_num)+"_"+str(time.time())+".csv"
-        files_collected.append(fn)
-        print(files_collected)
-        df.to_csv(fn,index=False)
+        fn = "class_"+str(class_num)+"_"+str(time.time())+".csv"
+        files_collected[class_num].append(fn)
+        print(f"class: {class_num}, collected {len(files_collected[class_num])}")
+        df.to_csv(os.path.join("data","class_"+str(class_num),files_collected[class_num][-1]),index=False)
         print(f"saved to file {fn}")
         count = 0
         collected_first_item = True
+        time.sleep(0.5)
 
     # calculate the fps
     frame_count += 1
@@ -164,20 +165,24 @@ while True:
     
     cv2.imshow('window',image)
 
-    if collected_first_item:
-        last_lm_list = csv_to_mp_landmark(files_collected[-1])
-        blank[:,:,:] = 0
-        mp_drawing.draw_landmarks(
+    if not hand_in_frame and len(files_collected[class_num]) > 0:
+        try:
+            last_lm_list = csv_to_mp_landmark(os.path.join("data","class_"+str(class_num),files_collected[class_num][-1]))
+            blank[:,:,:] = 0
+            if seq_idx == len(last_lm_list):
+                seq_idx = 0
+            mp_drawing.draw_landmarks(
                 blank,
                 last_lm_list[seq_idx],
                 mp_hands.HAND_CONNECTIONS,
                 mp_drawing_styles.get_default_hand_landmarks_style(),
                 mp_drawing_styles.get_default_hand_connections_style())
-        cv2.putText(blank, "class:"+files_collected[-1].split('_')[1], (200, 30), font, 0.5, (0, 255, 0), 1, cv2.LINE_AA)
-        cv2.imshow('last sequence',blank)
-        seq_idx += 1
-        if seq_idx == len(last_lm_list):
-            seq_idx = 0
+            cv2.putText(blank, "class:"+files_collected[class_num][-1].split('_')[1], (200, 30), font, 0.5, (0, 255, 0), 1, cv2.LINE_AA)
+            cv2.imshow('last sequence',blank)
+            seq_idx += 1
+        except:
+            print(f"ERROR: {files_collected[class_num][-1]}, check last data point")
+            exit()
 
     # get key
     k = cv2.waitKey(1)
@@ -196,9 +201,12 @@ while True:
             class_num = 24
         print(f"Switched to Class {class_num}")
     elif k == ord('d'):
-        print(f"Deleting {files_collected[-1]}")
-        os.remove(files_collected[-1])
-        files_collected = files_collected[:-1]
-        print(files_collected)
-        print("viewing sample:",files_collected[-1])
+        print(f"Deleting {files_collected[class_num][-1]}")
+        os.remove(os.path.join("data","class_"+str(class_num),files_collected[class_num][-1]))
+        files_collected[class_num] = files_collected[class_num][:-1]
+        
+        if len(files_collected[class_num]) == 0:
+            collected_first_item = False
+        else:
+            print("viewing sample:",files_collected[class_num][-1])
         
