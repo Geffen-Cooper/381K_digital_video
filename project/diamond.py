@@ -3,13 +3,20 @@ import time
 import numpy as np
 import matplotlib.pyplot as plt
 
+from torchvision import models,transforms
+from tqdm import tqdm
+import torch
+
 # init rect
 RECT_W = 110
 RECT_H = 110
-SEARCH_SIZE = 150
+SEARCH_SIZE = 112
 
 # initialize the capture object
-cap = cv2.VideoCapture(0)
+cap = cv2.VideoCapture(0, cv2.CAP_DSHOW) # this is the magic!
+
+cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
 FRAME_W = cap.get(cv2.CAP_PROP_FRAME_WIDTH) 
 FRAME_H = cap.get(cv2.CAP_PROP_FRAME_HEIGHT) 
 
@@ -30,6 +37,11 @@ center_brc_x = int(FRAME_W/2 + RECT_W/2)
 center_brc_y = int(FRAME_H/2 + RECT_H/2)
 start_point = np.array([center_tlc_x, center_tlc_y])
 end_point = np.array([center_brc_x, center_brc_y])
+
+model = models.shufflenet_v2_x0_5(weights='DEFAULT')
+model.fc = torch.nn.Linear(1024,4)
+model.load_state_dict(torch.load("ml/models/baseline.pth")['model_state_dict'])
+model.eval()
 
 start_tracking = False
 
@@ -173,6 +185,17 @@ while True:
                 max_l1 = np.min(l1)
         if np.min(l1) > 13:
             box_color = (0,0,255)
+            center = (start_point[0]+RECT_W//2,start_point[1]+RECT_H//2)
+            with torch.no_grad():
+                input = transforms.ToTensor()(img[center[1]-SEARCH_SIZE:center[1]+SEARCH_SIZE,center[0]-SEARCH_SIZE:center[0]+SEARCH_SIZE]).unsqueeze(0)
+                out = model(input)*224
+                x,y,w,h = int(out[0][0]),int(out[0][1]),int(out[0][2]),int(out[0][3])
+                first_rect = img[center[1]-SEARCH_SIZE+y:center[1]-SEARCH_SIZE+y+h,\
+                                 center[0]-SEARCH_SIZE+x:center[0]-SEARCH_SIZE+x+w]
+                start_point[0] = center[0]-SEARCH_SIZE+x
+                start_point[1] = center[1]-SEARCH_SIZE+y
+                end_point[0] = center[0]-SEARCH_SIZE+x+w
+                end_point[1] = center[1]-SEARCH_SIZE+y+h
         else:
             box_color = (0,150,0)
         print(f"best match: ({y_off},{x_off}) after {count} diffs, curr diff: {np.min(l1)}, running diff: {int(running_l1)}, max diff: {int(max_l1)}") 
