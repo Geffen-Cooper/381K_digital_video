@@ -18,18 +18,28 @@ fps = 0
 font = cv2.FONT_HERSHEY_SIMPLEX
 
 # coordinates of center rectangle
+
+# rectangle initial width and height
 R_W = 100
 R_H = 100
+
+# min and max widths and heights
 MIN_R_W = 56
 MIN_R_H = 56
 MAX_R_W = 224
 MAX_R_H = 224
+
+# coordinates of the rectangle
 CENTER_TLX = W//2 - R_W//2
 CENTER_TLY = H//2 - R_H//2
 CENTER_BRX = W//2 + R_W//2
 CENTER_BRY = H//2 + R_H//2
+
+# coordinates of the rectangle
 start_point = np.array([int(CENTER_TLX),int(CENTER_TLY)])
 end_point = np.array([int(CENTER_BRX),int(CENTER_BRY)])
+
+# coordinates of the search space
 outer_start_point = start_point-np.abs(np.array([R_W,R_H])-MAX_R_W)//2
 outer_end_point = end_point+np.abs(np.array([R_W,R_H])-MAX_R_H)//2
 
@@ -102,21 +112,27 @@ while True:
         cv2.destroyAllWindows()
         break
     elif k == ord('r'):
-        # first save, then generate new
-        cv2.imwrite("palm_imgs/"+str(start_point[0]-outer_start_point[0])+"_"+str(start_point[1]-outer_start_point[1])+"_"+\
+        # first save the rectangle in search space coordinate
+        cv2.imwrite("palm_imgs\\data\\"+str(start_point[0]-outer_start_point[0])+"_"+str(start_point[1]-outer_start_point[1])+"_"+\
                     str(R_W)+"_"+str(R_H)+"-"+str(time.time())+".png",\
                     img[outer_start_point[1]:outer_end_point[1],outer_start_point[0]:outer_end_point[0]])
 
-        x,y,w,h = get_rand_rect(W,H,75,75,150,150,0.75,1/.75)
-        print(x,y,w,h)
+        # new random rectangle (in frame coordinates)
+        x,y,w,h = get_rand_rect(W,H,65,65,150,150,0.75,1/.75)
+        # print(x,y,w,h)
+
+        # rectangle coordinates and w and height
         start_point[0],start_point[1] = x,y
         end_point[0],end_point[1] = x+w,y+h
         R_W,R_H = int(w),int(h)
 
+        # generate random search space coordinates
         outer_start_point[0] = start_point[0]-int(np.random.rand(1)*(MAX_R_W-R_W))
         outer_start_point[1] = start_point[1]-int(np.random.rand(1)*(MAX_R_H-R_H))
         outer_end_point[0] = outer_start_point[0]+MAX_R_W
         outer_end_point[1] = outer_start_point[1]+MAX_R_H
+
+        # adjust if out of the frame
         if outer_start_point[0] < 0:
             outer_start_point[0] = 0
             outer_end_point[0] = outer_start_point[0] + MAX_R_W

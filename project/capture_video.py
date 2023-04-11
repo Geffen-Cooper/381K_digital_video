@@ -1,6 +1,5 @@
 import cv2
 import time
-import numpy as np
 
 # initialize the capture object
 cap = cv2.VideoCapture(0)
@@ -18,6 +17,8 @@ fps = 0
 font = cv2.FONT_HERSHEY_SIMPLEX
 
 # start loop
+i = 0
+start_tracking = False
 while True:
     # try to read a frame
     ret,img = cap.read()
@@ -26,7 +27,7 @@ while True:
 
     # flip horizontally
     img = cv2.flip(img,1)
-
+  
     # calculate the fps
     frame_count += 1
     curr_frame_time = time.time()
@@ -39,10 +40,15 @@ while True:
     cv2.putText(img, fps+", "+str(int(W))+"x"+str(int(H)), (7, 30), font, 1, (100, 255, 0), 1, cv2.LINE_AA)
     cv2.imshow('window',img)
 
-    # quit when click 'q' on keyboard
+    if start_tracking:
+        cv2.imwrite("video_frames/frame__"+str(i)+".png",img)
+        i += 1
+
     # get key
     k = cv2.waitKey(1)
 
     if k == ord('q'):
         cv2.destroyAllWindows()
         break
+    elif k == ord('s'):
+        start_tracking = True

@@ -206,11 +206,13 @@ while True:
     
     overlay = img.copy()
     img_disp = img.copy()
-    cv2.rectangle(overlay, start_point-SEARCH_SIZE, end_point+SEARCH_SIZE, box_color, -1)
+    center = np.array([start_point[0]+RECT_W//2,start_point[1]+RECT_H//2])
+    cv2.rectangle(overlay, center-SEARCH_SIZE, center+SEARCH_SIZE, box_color, -1)
     img_disp = cv2.addWeighted(overlay, 0.1, img_disp, 1 - 0.1, 0)
     cv2.putText(img_disp,str(x_off)+","+str(y_off),start_point-10,font, 1, (0, 0, 0), 1, cv2.LINE_AA)
     cv2.rectangle(img_disp, (start_point[0],start_point[1]), end_point, box_color, 4)
-    cv2.arrowedLine(img_disp, (start_point[0]-x_off,start_point[1]-y_off), start_point,(0, 0, 0), 3)
+    cv2.arrowedLine(img_disp, (start_point[0]+RECT_W//2-x_off,start_point[1]+RECT_H//2-y_off), (start_point[0]+RECT_W//2,start_point[1]+RECT_H//2),(0, 0, 0), 3)
+    cv2.circle(img_disp,(start_point[0]+RECT_W//2,start_point[1]+RECT_H//2),4,box_color)
   
     # calculate the fps
     frame_count += 1
@@ -227,7 +229,7 @@ while True:
     cv2.putText(img_disp, "Avg. Error:", (300-40, 23), font, 0.5, (0, 0, 0), 1, cv2.LINE_AA)
     cv2.rectangle(img_disp,(300+50,8),(620,30),(0,0,0),1)
     cv2.rectangle(img_disp,(304+50,12),(304+50+int((615-305-50)*running_l1/100),26),box_color,-1)
-    cv2.rectangle(img_disp,(300+50,8),(305+50+int((615-305-50)*10/100),30),(0,0,0),1)
+    cv2.rectangle(img_disp,(300+50,8),(305+50+int((615-305-50)*13/100),30),(0,0,0),1)
 
     cv2.putText(img_disp, "Avg. Diffs: "+str(round(running_count,1)), (300-90, 23+32), font, 0.5, (0, 0, 0), 1, cv2.LINE_AA)
     cv2.rectangle(img_disp,(300+50,8+30),(620,30+30),(0,0,0),1)

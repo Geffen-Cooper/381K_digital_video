@@ -53,11 +53,11 @@ x_rel = 0
 y_rel = 0
 
 # pad to expected output size
-center_patch = np.zeros((RECT_H*2+RECT_H-1,RECT_W*2+RECT_W-1), np.uint8)
-search_patch = np.zeros((RECT_H*2+RECT_H-1,RECT_W*2+RECT_W-1), np.uint8)
-# filter = np.zeros((int(FRAME_H+3-1),int(FRAME_W+3-1)), np.uint8)
-# input = np.zeros((int(FRAME_H+3-1),int(FRAME_W+3-1)), np.uint8)
-# sobel = np.array([[1,2,1],[0,0,0],[-1,-2,-1]],np.uint8)
+# center_patch = np.zeros((RECT_H*2+RECT_H-1,RECT_W*2+RECT_W-1), np.uint8)
+# search_patch = np.zeros((RECT_H*2+RECT_H-1,RECT_W*2+RECT_W-1), np.uint8)
+filter = np.zeros((int(FRAME_H+3-1),int(FRAME_W+3-1)), np.uint8)
+input = np.zeros((int(FRAME_H+3-1),int(FRAME_W+3-1)), np.uint8)
+sobel = np.array([[1,2,1],[0,0,0],[-1,-2,-1]],np.uint8)
 # start loop
 while True:
     # try to read a frame
@@ -74,27 +74,28 @@ while True:
     # update position
     if start_tracking:
         # center_patch = img[start_point[1]:end_point[1],start_point[0]:end_point[0]]
-        center_patch[RECT_H:RECT_H*2,RECT_W:RECT_W*2] = img_[start_point[1]:end_point[1],start_point[0]:end_point[0],0]
-        center_patch = cv2.flip(center_patch,0)
-        center_patch = cv2.flip(center_patch,1)
-        # filter[int(FRAME_H//2-1-1):int(FRAME_H//2-1-1+3),int(FRAME_W//2-1-1):int(FRAME_W//2-1-1+3)] = sobel
-        # input[1:int(1+FRAME_H),1:int(1+FRAME_W)] = img_[:,:,0]
-        search_patch[RECT_H-RECT_H//2:RECT_H*2+RECT_H//2,RECT_W-RECT_W//2:RECT_W*2+RECT_W//2] = img_[start_point[1]-RECT_H//2:end_point[1]+RECT_H//2,start_point[0]-RECT_W//2:end_point[0]+RECT_W//2,0]
+        # center_patch[RECT_H:RECT_H*2,RECT_W:RECT_W*2] = img_[start_point[1]:end_point[1],start_point[0]:end_point[0],0]
+        # center_patch = cv2.flip(center_patch,0)
+        # center_patch = cv2.flip(center_patch,1)
+        filter[int(FRAME_H//2-1-1):int(FRAME_H//2-1-1+3),int(FRAME_W//2-1-1):int(FRAME_W//2-1-1+3)] = sobel
+        input[1:int(1+FRAME_H),1:int(1+FRAME_W)] = img_[:,:,0]
+        # search_patch[RECT_H-RECT_H//2:RECT_H*2+RECT_H//2,RECT_W-RECT_W//2:RECT_W*2+RECT_W//2] = img_[start_point[1]-RECT_H//2:end_point[1]+RECT_H//2,start_point[0]-RECT_W//2:end_point[0]+RECT_W//2,0]
         
-        F1 = np.fft.fft2(center_patch)
-        F2 = np.fft.fft2(search_patch)
+        F1 = np.fft.fft2(filter)
+        F2 = np.fft.fft2(input)
         F3 = F1*F2
         _img = np.fft.ifft2(F3).astype(np.uint8)
         _img = np.fft.fftshift(_img)
-        closest = np.argmax(_img)
-        col = (closest % (RECT_H+RECT_W))
-        row = (closest // (RECT_H+RECT_W))
-        _img[row,:] = 255
-        _img[:,col] = 255
+        # closest = np.argmax(_img)
+        # col = (closest % (RECT_H+RECT_W))
+        # row = (closest // (RECT_H+RECT_W))
+        # _img[row,:] = 255
+        # _img[:,col] = 255
 
-        cv2.imshow('patch',img_[:,:,0])
-    cv2.rectangle(img, start_point, end_point, (0,0,255), 4)
-    cv2.circle(img, (start_point[0]+RECT_W//2,start_point[1]+RECT_H//2), radius=6, color=(0, 0, 255), thickness=-1)
+        # cv2.imshow('patch',img_[:,:,0])
+        cv2.imshow("window2",_img)
+    # cv2.rectangle(img, start_point, end_point, (0,0,255), 4)
+    # cv2.circle(img, (start_point[0]+RECT_W//2,start_point[1]+RECT_H//2), radius=6, color=(0, 0, 255), thickness=-1)
     # center_patch *= 0
     # search_patch *= 0
 
