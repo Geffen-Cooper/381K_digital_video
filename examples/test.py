@@ -5,6 +5,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from scipy.signal import medfilt
 import numpy as np
+import torch.nn.functional as F
 
 import time
 import cv2
@@ -14,39 +15,65 @@ mp_drawing = mp.solutions.drawing_utils
 mp_drawing_styles = mp.solutions.drawing_styles
 mp_hands = mp.solutions.hands
 
+hands = mp_hands.Hands(model_complexity=1,
+        min_detection_confidence=0.5,
+        min_tracking_confidence=0.5)
 
-# Create RNN Model
-class RNNModel(torch.nn.Module):
-    def __init__(self, input_dim, hidden_dim, layer_dim, output_dim):
-        super(RNNModel, self).__init__()
-        
+
+descriptions = ["Swipe Hand Left","Swipe Hand Right","Swipe Hand Up","Swipe Hand Down",\
+                "Swipe Two Fingers Left","Swipe Two Fingers Right","Swipe Two Fingers Up","Swipe Two FIngers Down",\
+                "Swipe Index Finger Down","Beckon With Hand","Expand Hand","Jazz Hand","One Finger Up","Two Fingers Up","THree Fingers Up",\
+                "Lift Hand Up","Move Hand Down","Move Hand Forward","Beckon With Arm","TwoFingers Clockwise","Two Fingers CounterClockwise",
+                "Two Fingers Forward","Close Hand","Thumbs Up","OK"]
+
+# Create RNN Model with attention
+class AttentionRNNModel(torch.nn.Module):
+    def __init__(self, input_dim, hidden_dim, layer_dim, output_dim, device):
+        super(AttentionRNNModel, self).__init__()
+
         # Number of hidden dimensions
         self.hidden_dim = hidden_dim
-        
+
         # Number of hidden layers
         self.layer_dim = layer_dim
-        
+
+        self.device = device
+
         # RNN
-        # self.rnn = torch.nn.RNN(input_dim, hidden_dim, layer_dim, batch_first=True, nonlinearity='relu')
         self.rnn = torch.nn.LSTM(input_dim, hidden_dim, layer_dim, batch_first=True)
+
+        # attention
+        self.attention = torch.nn.Linear(hidden_dim, 1)
+
         # Readout layer
         self.fc = torch.nn.Linear(hidden_dim, output_dim)
-    
+
     def forward(self, x):
         # Initialize hidden state with zeros
-        h0 = torch.zeros(self.layer_dim, x.size(0), self.hidden_dim)#.to('cuda')
-        c0 = torch.zeros(self.layer_dim, x.size(0), self.hidden_dim)#.to('cuda')
-            
-        # loop
-        out, (hi,ci) = self.rnn(x[:,0,:].unsqueeze(1), (h0,c0))
-        pred = self.fc(out[:,-1,:])
-        for i in range(1,x.shape[1]):
-            out, (hi,ci) = self.rnn(x[:,i,:].unsqueeze(1), (hi,ci))
-            pred += self.fc(out[:,-1,:])
-        return pred/x.shape[1]
+        h0 = torch.zeros(self.layer_dim, x.size(0), self.hidden_dim).to(self.device)
+        c0 = torch.zeros(self.layer_dim, x.size(0), self.hidden_dim).to(self.device)
+
+        # (batch_size,sequence length) since we want a weight for each hidden state in the sequence
+        attention_weights = torch.zeros((x.shape[0],x.shape[1])).to(self.device)
+
+        # output shape is (batch size, sequence length, feature dim)
+        output, (hn, cn) = self.rnn(x, (h0, c0))
+        
+        # for each time step, get the attention weight (do this over the batch)
+        for i in range(x.shape[1]):
+            attention_weights[:,i] = self.attention(output[:,i,:]).view(-1)
+        attention_weights = F.softmax(attention_weights,dim=1)
+
+        # apply attention weights for each element in batch
+        attended = torch.zeros(output.shape[0],output.shape[2]).to(self.device)
+        for i in range(x.shape[0]):
+            attended[i,:] = attention_weights[i]@output[i,:,:]
+
+        return self.fc(attended)
     
-model = RNNModel(63,256,1,25)
-model.load_state_dict(torch.load("test_acc_50.pth"))
+# load the model
+model = AttentionRNNModel(63,256,1,25,'cpu')
+model.load_state_dict(torch.load("model.pth",map_location=torch.device('cpu'))['model_state_dict'])
 model.eval()
 
 # initialize the capture object
@@ -64,27 +91,21 @@ frame_count = 0
 fps = 0
 font = cv2.FONT_HERSHEY_SIMPLEX
 
-mpHands = mp.solutions.hands
-hands = mpHands.Hands(model_complexity=1,
-        min_detection_confidence=0.5,
-        min_tracking_confidence=0.5)
-mpDraw = mp.solutions.drawing_utils
-
-
-
 count = 0
+no_hand_count = 0
 
-start = False
+hand_in_frame = False
+
 # start loop
 while True:
     # try to read a frame
-    ret,image = cap.read()
+    ret,img = cap.read()
     if not ret:
         raise RuntimeError("failed to read frame")
 
     # flip horizontally
     # image = cv2.flip(image,1)
-    image = cv2.resize(image,(320, 240))
+    image = cv2.resize(img,(320, 240))
 
     image.flags.writeable = False
     image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
@@ -94,20 +115,18 @@ while True:
     image.flags.writeable = True
     image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
     if results.multi_hand_landmarks:
-        if start == False:
-            start = True
+        if hand_in_frame == False:
+            hand_in_frame = True
             print("STARTING===========")
             lms_x = ["lmx"+str(i) for i in range(21)]
             lms_y = ["lmy"+str(i) for i in range(21)]
             lms_z = ["lmz"+str(i) for i in range(21)]
             col_names = lms_x + lms_y + lms_z
             df = pd.DataFrame(columns=col_names)
-        # print(results.multi_hand_landmarks[0].landmark[0])
-        # exit()
-        # print(f"count:{count} --> HAND")
+        
         for hand_landmarks in results.multi_hand_landmarks:
             mp_drawing.draw_landmarks(
-                image,
+                img,
                 hand_landmarks,
                 mp_hands.HAND_CONNECTIONS,
                 mp_drawing_styles.get_default_hand_landmarks_style(),
@@ -120,16 +139,24 @@ while True:
                 lm_list_y.append(lm.y)
                 lm_list_z.append(lm.z)
         df.loc[len(df.index)] = lm_list_x+lm_list_y+lm_list_z
-    elif start == True:
+    elif hand_in_frame == True:
         # print(f"count:{count} --> NOTHING")
         df.loc[len(df.index)] = [0 for j in range(63)]
+        no_hand_count += 1
 
-    if count == 79:
-        start = False
+    if no_hand_count == 20 or count == 80:
+        hand_in_frame = False
+
+        if count < 30:
+            print("False Positive")
+            count = 0
+            no_hand_count = 0
+            continue
+
         landmarks_seq = df.values
         for col in range(landmarks_seq.shape[1]):
             x = landmarks_seq[:,col]
-            x = medfilt(x,5)
+            # x = medfilt(x,5)
             x = (x-np.min(x))/(np.max(x)-(np.min(x))+1e-6)
             x = (x-np.mean(x))/(np.std(x)+1e-6)
             landmarks_seq[:,col] = x
@@ -139,15 +166,16 @@ while True:
 
         with torch.no_grad():
             model.eval()
-            pred = model(landmarks_seq)
+            pred = F.softmax(model(landmarks_seq))
 
         print("prediction:")
         val,idxs = torch.topk(pred,5)
         for i in range(5):
-            print(f"class:{idxs[0][i]}, {val[0][i]}")
+            print(f"{descriptions[idxs[0][i]]}, {val[0][i]}")
         count = 0
+        no_hand_count = 0
     
-    if start == True:
+    if hand_in_frame == True:
         count += 1
 
     # calculate the fps
@@ -159,8 +187,8 @@ while True:
         last_frame_time = curr_frame_time
         frame_count = 0
     # img, text, location of BLC, font, size, color, thickness, linetype
-    cv2.putText(image, fps+", "+str(int(W))+"x"+str(int(H)), (7, 30), font, 1, (100, 255, 0), 1, cv2.LINE_AA)
-    cv2.imshow('window',image)
+    cv2.putText(img, fps+", "+str(int(W))+"x"+str(int(H)), (7, 30), font, 1, (100, 255, 0), 1, cv2.LINE_AA)
+    cv2.imshow('window',img)
 
     # quit when click 'q' on keyboard
     if cv2.waitKey(1) & 0xFF == ord('q'):
