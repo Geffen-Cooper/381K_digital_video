@@ -229,6 +229,6 @@ def validate(model, val_loader, device, loss_fn):
 if __name__ == "__main__":
 
     train_params = {'loss': "L1smooth", 'from_checkpoint': None, 'optimizer': "Adam", 'log_name': "baseline_finetune", 'root_dir': "palm_imgs",
-                    'batch_size': 32, 'epochs': 50, 'ese': 5, 'lr': 0.001, 'use_cuda': True, 'seed': 42,'save_model_ckpt': True}
+                    'batch_size': 32, 'epochs': 50, 'ese': 5, 'lr': 0.002, 'use_cuda': True, 'seed': 42,'save_model_ckpt': True}
 
     train(**train_params)
