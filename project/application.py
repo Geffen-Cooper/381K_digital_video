@@ -45,6 +45,9 @@ model.eval()
 
 start_tracking = False
 
+got_wrong = False
+got_right = False
+
 # try to read a frame
 ret,img = cap.read()
 if not ret:
@@ -101,6 +104,7 @@ first_frame = True
 reset = False
 first_rect = None
 box_color = (0,150,0)
+arrow_color = (0,0,255)
 
 
 #lock_input_coords = [[0,0],[0,1],[0,2],[1,2],[2,3]]
@@ -115,7 +119,10 @@ lock_points = np.zeros((5,5,2))
 for row in range(5):
     for col in range(5):
         lock_points[row,col,:] = [(row+1)*edge_len_y,col*edge_len_y+edge_locs_x_offset]
+lock_done = False
 
+lock_code = np.array([[2,2],[1,2],[1,3],[2,3],[3,3],[3,2],[3,1],[2,1],[1,1],[0,1],[0,2],[0,3],[0,4],[1,4],\
+                      [2,4],[3,4],[4,4],[4,3],[4,2],[4,1],[4,0],[3,0],[2,0],[1,0],[0,0]])
 
 # start loop
 while True:
@@ -129,7 +136,7 @@ while True:
 
     # === Rectangle tracking update ===
     # update position
-    if start_tracking:
+    if start_tracking and lock_done == False:
         l1 = np.ones(9)*1e9
         count = 0
         iteration = 0
@@ -162,7 +169,7 @@ while True:
             # update current offset
             if last_dir == 0: # we handle the center case differently since the inner diamond is different
                 if next_dir != 0: # only add an offset if not in the center
-                    print(next_dir)
+                    # print(next_dir)
                     x_off += c_search_locs[next_dir-1][1]
                     y_off += c_search_locs[next_dir-1][0] 
             else:
@@ -196,7 +203,7 @@ while True:
             running_count = running_count*alpha + count*(1-alpha)
             if np.min(l1) > max_l1:
                 max_l1 = np.min(l1)
-        if np.min(l1) > 13:
+        if np.min(l1) > 20:
             box_color = (0,0,255)
             # center = (start_point[0]+RECT_W//2,start_point[1]+RECT_H//2)
             # with torch.no_grad():
@@ -212,7 +219,7 @@ while True:
                 # need to account for cases where hit the edge
         else:
             box_color = (0,150,0)
-        print(f"best match: ({y_off},{x_off}) after {count} diffs, curr diff: {np.min(l1)}, running diff: {int(running_l1)}, max diff: {int(max_l1)}") 
+        # print(f"best match: ({y_off},{x_off}) after {count} diffs, curr diff: {np.min(l1)}, running diff: {int(running_l1)}, max diff: {int(max_l1)}") 
        
         # update the position after tracking
         start_point[0] += x_off
@@ -266,12 +273,14 @@ while True:
     cv2.putText(img_disp, "Avg. Error:", (300-40, 23), font, 0.5, (0, 0, 0), 1, cv2.LINE_AA)
     cv2.rectangle(img_disp,(300+50,8),(620,30),(0,0,0),1)
     cv2.rectangle(img_disp,(304+50,12),(304+50+int((615-305-50)*running_l1/100),26),box_color,-1)
-    cv2.rectangle(img_disp,(300+50,8),(305+50+int((615-305-50)*13/100),30),(0,0,0),1)
+    cv2.rectangle(img_disp,(300+50,8),(305+50+int((615-305-50)*20/100),30),(0,0,0),1)
 
     cv2.putText(img_disp, "Avg. Diffs: "+str(round(running_count,1)), (300-90, 23+32), font, 0.5, (0, 0, 0), 1, cv2.LINE_AA)
     cv2.rectangle(img_disp,(300+50,8+30),(620,30+30),(0,0,0),1)
     cv2.rectangle(img_disp,(304+50,12+30),(304+50+int((615-305)*running_count/500),26+30),(0,0,0),-1)
     
+    # if lock_done == True:
+    #     img_disp = img.copy()
 
     # draw lock pattern
     edge_len_y = int(FRAME_H // 6)
@@ -295,14 +304,46 @@ while True:
     for i,selected in enumerate(lock_input_coords):
         # last coord goes to cursor
         if i + 1 == len(lock_input_coords):
-            coords_start = lock_points[lock_input_coords[i][0],lock_input_coords[i][1]]
-            cv2.arrowedLine(img_disp, (int(coords_start[1]),int(coords_start[0])), cursor_pos,(0, 0, 200), 2)
+            if not lock_done:
+                coords_start = lock_points[lock_input_coords[i][0],lock_input_coords[i][1]]
+                cv2.arrowedLine(img_disp, (int(coords_start[1]),int(coords_start[0])), cursor_pos,arrow_color, 2)
         else:
             coords_start = lock_points[lock_input_coords[i][0],lock_input_coords[i][1]]
             coords_end = lock_points[lock_input_coords[i+1][0],lock_input_coords[i+1][1]]
-            cv2.arrowedLine(img_disp, (int(coords_start[1]),int(coords_start[0])), (int(coords_end[1]),int(coords_end[0])),(0, 0, 200), 2)
+            cv2.arrowedLine(img_disp, (int(coords_start[1]),int(coords_start[0])), (int(coords_end[1]),int(coords_end[0])),arrow_color, 2)
 
+    if got_wrong and not start_tracking and not got_right:
+        cv2.putText(img_disp, "WRONG, Try Again", (175,455), font, 1, (0, 0, 255), 2, cv2.LINE_AA)  
+    if got_right:
+        cv2.putText(img_disp, "UNLOCKED", (235,455), font, 1, (0, 150, 0), 2, cv2.LINE_AA)  
+        start_tracking = False
     cv2.imshow("("+str(int(FRAME_W))+"x"+str(int(FRAME_H))+")",img_disp)
+
+    if box_color == (0,0,255):
+        lock_done = True
+        # print(np.array(lock_input_coords)==lock_code)
+        if len(lock_input_coords) == len(lock_code) and (np.array(lock_input_coords) == lock_code).all():
+            got_right = True
+            start_point = np.array([center_tlc_x, center_tlc_y])
+            end_point = np.array([center_brc_x, center_brc_y])
+            box_color = (0,150,0)
+            arrow_color = (0,150,0)
+        else:
+            lock_input_coords = [[2,2]]
+            start_tracking = False
+            lock_done = False
+            box_color = (0,150,0)
+            running_l1 = 0
+            running_count = 0
+            max_l1 = 0
+            first_frame = True
+            first_rect = None
+            x_off = 0
+            y_off = 0
+            start_point = np.array([center_tlc_x, center_tlc_y])
+            end_point = np.array([center_brc_x, center_brc_y])
+            got_wrong = True
+      
 
     # get key
     k = cv2.waitKey(1)
