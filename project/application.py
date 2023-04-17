@@ -203,20 +203,36 @@ while True:
             running_count = running_count*alpha + count*(1-alpha)
             if np.min(l1) > max_l1:
                 max_l1 = np.min(l1)
-        if np.min(l1) > 20:
+        if np.min(l1) > 6 and np.min(l1) < 16:
+            # box_color = (0,0,255)
+            with torch.no_grad():
+                input = transforms.ToTensor()(img[center[1]-SEARCH_SIZE:center[1]+SEARCH_SIZE,center[0]-SEARCH_SIZE:center[0]+SEARCH_SIZE]).unsqueeze(0)
+                out = model(input)*224
+                x,y,w,h = int(out[0][0]),int(out[0][1]),int(out[0][2]),int(out[0][3])
+                # first_rect = img[center[1]-SEARCH_SIZE+y:center[1]-SEARCH_SIZE+y+h,\
+                #                  center[0]-SEARCH_SIZE+x:center[0]-SEARCH_SIZE+x+w]
+                start_point[0] = center[0]-SEARCH_SIZE+x
+                start_point[1] = center[1]-SEARCH_SIZE+y
+                end_point[0] = center[0]-SEARCH_SIZE+x+w
+                end_point[1] = center[1]-SEARCH_SIZE+y+h
+
+                # check collision
+                if start_point[0] <= 0: # left
+                    start_point[0] = 0
+                    end_point[0] = RECT_W
+                if start_point[1] <= 0: # top
+                    start_point[1] = 0
+                    end_point[1] = RECT_H
+                if end_point[0] >= FRAME_W: # right
+                    end_point[0] = FRAME_W
+                    start_point[0] = FRAME_W - RECT_W
+                if end_point[1] >= FRAME_H: # bottom
+                    end_point[1] = FRAME_H
+                    start_point[1] = FRAME_H - RECT_H
+
+                first_rect = img[start_point[1]:end_point[1],start_point[0]:end_point[0]]
+        elif np.min(l1) > 16:
             box_color = (0,0,255)
-            # center = (start_point[0]+RECT_W//2,start_point[1]+RECT_H//2)
-            # with torch.no_grad():
-            #     input = transforms.ToTensor()(img[center[1]-SEARCH_SIZE:center[1]+SEARCH_SIZE,center[0]-SEARCH_SIZE:center[0]+SEARCH_SIZE]).unsqueeze(0)
-            #     out = model(input)*224
-            #     x,y,w,h = int(out[0][0]),int(out[0][1]),int(out[0][2]),int(out[0][3])
-            #     first_rect = img[center[1]-SEARCH_SIZE+y:center[1]-SEARCH_SIZE+y+h,\
-            #                      center[0]-SEARCH_SIZE+x:center[0]-SEARCH_SIZE+x+w]
-            #     start_point[0] = center[0]-SEARCH_SIZE+x
-            #     start_point[1] = center[1]-SEARCH_SIZE+y
-            #     end_point[0] = center[0]-SEARCH_SIZE+x+w
-            #     end_point[1] = center[1]-SEARCH_SIZE+y+h
-                # need to account for cases where hit the edge
         else:
             box_color = (0,150,0)
         # print(f"best match: ({y_off},{x_off}) after {count} diffs, curr diff: {np.min(l1)}, running diff: {int(running_l1)}, max diff: {int(max_l1)}") 

@@ -149,7 +149,7 @@ while True:
             # update current offset
             if last_dir == 0: # we handle the center case differently since the inner diamond is different
                 if next_dir != 0: # only add an offset if not in the center
-                    print(next_dir)
+                    # print(next_dir)
                     x_off += c_search_locs[next_dir-1][1]
                     y_off += c_search_locs[next_dir-1][0] 
             else:
@@ -183,11 +183,29 @@ while True:
             running_count = running_count*alpha + count*(1-alpha)
             if np.min(l1) > max_l1:
                 max_l1 = np.min(l1)
-        if np.min(l1) > 13:
+        if np.min(l1) > 6:
             box_color = (0,0,255)
-            center = (start_point[0]+RECT_W//2,start_point[1]+RECT_H//2)
+            center = (start_point[0]+(end_point[0]-start_point[0])//2,start_point[1]+(end_point[1]-start_point[1])//2)
             with torch.no_grad():
-                input = transforms.ToTensor()(img[center[1]-SEARCH_SIZE:center[1]+SEARCH_SIZE,center[0]-SEARCH_SIZE:center[0]+SEARCH_SIZE]).unsqueeze(0)
+                search_tlx = center[0]-SEARCH_SIZE
+                search_tly = center[1]-SEARCH_SIZE
+                search_brx = center[0]+SEARCH_SIZE
+                search_bry = center[1]+SEARCH_SIZE
+                # check collision
+                if search_tlx <= 0: # left
+                    search_tlx = 0
+                    search_brx = 2*SEARCH_SIZE
+                if search_tly <= 0: # top
+                    search_tly = 0
+                    search_bry = 2*SEARCH_SIZE
+                if search_brx >= FRAME_W: # right
+                    search_brx = FRAME_W
+                    search_tlx = FRAME_W - 2*SEARCH_SIZE
+                if search_bry >= FRAME_H: # bottom
+                    search_bry = FRAME_H
+                    search_tly = FRAME_H - 2*SEARCH_SIZE
+                input = transforms.ToTensor()(img[int(search_tly):int(search_bry),int(search_tlx):int(search_brx)]).unsqueeze(0)
+                print(center,search_tlx,search_brx,search_tly,search_bry,input.shape)
                 out = model(input)*224
                 x,y,w,h = int(out[0][0]),int(out[0][1]),int(out[0][2]),int(out[0][3])
                 # first_rect = img[center[1]-SEARCH_SIZE+y:center[1]-SEARCH_SIZE+y+h,\
@@ -197,26 +215,27 @@ while True:
                 end_point[0] = center[0]-SEARCH_SIZE+x+w
                 end_point[1] = center[1]-SEARCH_SIZE+y+h
 
+                RECT_W = w
+                RECT_H = h
+
                 # check collision
                 if start_point[0] <= 0: # left
                     start_point[0] = 0
-                    end_point[0] = RECT_W
+                    end_point[0] = w
                 if start_point[1] <= 0: # top
                     start_point[1] = 0
-                    end_point[1] = RECT_H
+                    end_point[1] = h
                 if end_point[0] >= FRAME_W: # right
                     end_point[0] = FRAME_W
-                    start_point[0] = FRAME_W - RECT_W
+                    start_point[0] = FRAME_W - w
                 if end_point[1] >= FRAME_H: # bottom
                     end_point[1] = FRAME_H
-                    start_point[1] = FRAME_H - RECT_H
+                    start_point[1] = FRAME_H - h
 
                 first_rect = img[start_point[1]:end_point[1],start_point[0]:end_point[0]]
-
-                # need to account for cases where hit the edge
         else:
             box_color = (0,150,0)
-        print(f"best match: ({y_off},{x_off}) after {count} diffs, curr diff: {np.min(l1)}, running diff: {int(running_l1)}, max diff: {int(max_l1)}") 
+        # print(f"best match: ({y_off},{x_off}) after {count} diffs, curr diff: {np.min(l1)}, running diff: {int(running_l1)}, max diff: {int(max_l1)}") 
        
         # update the position after tracking
         start_point[0] += x_off
@@ -241,6 +260,7 @@ while True:
         start_point[1] = FRAME_H - RECT_H
    
     last_rect_px = img[start_point[1]:end_point[1],start_point[0]:end_point[0]]
+    # print(last_rect_px.shape)
     if not first_frame:
         last_rect_px = first_rect
     # cv2.imwrite("last.png",last_rect_px)
@@ -252,8 +272,9 @@ while True:
     img_disp = cv2.addWeighted(overlay, 0.1, img_disp, 1 - 0.1, 0)
     cv2.putText(img_disp,str(x_off)+","+str(y_off),start_point-10,font, 1, (0, 0, 0), 1, cv2.LINE_AA)
     cv2.rectangle(img_disp, (start_point[0],start_point[1]), end_point, box_color, 4)
-    cv2.arrowedLine(img_disp, (start_point[0]+RECT_W//2-x_off,start_point[1]+RECT_H//2-y_off), (start_point[0]+RECT_W//2,start_point[1]+RECT_H//2),(0, 0, 0), 3)
-    cv2.circle(img_disp,(start_point[0]+RECT_W//2,start_point[1]+RECT_H//2),4,box_color)
+    cv2.arrowedLine(img_disp, (start_point[0]+(end_point[0]-start_point[0])//2-x_off,start_point[1]+(end_point[1]-start_point[1])//2-y_off),\
+                     (start_point[0]+(end_point[0]-start_point[0])//2,start_point[1]+(end_point[1]-start_point[1])//2),(0, 0, 0), 3)
+    cv2.circle(img_disp,(start_point[0]+(end_point[0]-start_point[0])//2,start_point[1]+(end_point[1]-start_point[1])//2),4,box_color)
   
     # calculate the fps
     frame_count += 1
