@@ -205,8 +205,27 @@ while True:
                 max_l1 = np.min(l1)
         if np.min(l1) > 6 and np.min(l1) < 16:
             # box_color = (0,0,255)
+            center = (start_point[0]+(end_point[0]-start_point[0])//2,start_point[1]+(end_point[1]-start_point[1])//2)
             with torch.no_grad():
-                input = transforms.ToTensor()(img[center[1]-SEARCH_SIZE:center[1]+SEARCH_SIZE,center[0]-SEARCH_SIZE:center[0]+SEARCH_SIZE]).unsqueeze(0)
+                search_tlx = center[0]-SEARCH_SIZE
+                search_tly = center[1]-SEARCH_SIZE
+                search_brx = center[0]+SEARCH_SIZE
+                search_bry = center[1]+SEARCH_SIZE
+                # check collision
+                if search_tlx <= 0: # left
+                    search_tlx = 0
+                    search_brx = 2*SEARCH_SIZE
+                if search_tly <= 0: # top
+                    search_tly = 0
+                    search_bry = 2*SEARCH_SIZE
+                if search_brx >= FRAME_W: # right
+                    search_brx = FRAME_W
+                    search_tlx = FRAME_W - 2*SEARCH_SIZE
+                if search_bry >= FRAME_H: # bottom
+                    search_bry = FRAME_H
+                    search_tly = FRAME_H - 2*SEARCH_SIZE
+                input = transforms.ToTensor()(img[int(search_tly):int(search_bry),int(search_tlx):int(search_brx)]).unsqueeze(0)
+                print(center,search_tlx,search_brx,search_tly,search_bry,input.shape)
                 out = model(input)*224
                 x,y,w,h = int(out[0][0]),int(out[0][1]),int(out[0][2]),int(out[0][3])
                 # first_rect = img[center[1]-SEARCH_SIZE+y:center[1]-SEARCH_SIZE+y+h,\
@@ -216,19 +235,22 @@ while True:
                 end_point[0] = center[0]-SEARCH_SIZE+x+w
                 end_point[1] = center[1]-SEARCH_SIZE+y+h
 
+                RECT_W = w
+                RECT_H = h
+
                 # check collision
                 if start_point[0] <= 0: # left
                     start_point[0] = 0
-                    end_point[0] = RECT_W
+                    end_point[0] = w
                 if start_point[1] <= 0: # top
                     start_point[1] = 0
-                    end_point[1] = RECT_H
+                    end_point[1] = h
                 if end_point[0] >= FRAME_W: # right
                     end_point[0] = FRAME_W
-                    start_point[0] = FRAME_W - RECT_W
+                    start_point[0] = FRAME_W - w
                 if end_point[1] >= FRAME_H: # bottom
                     end_point[1] = FRAME_H
-                    start_point[1] = FRAME_H - RECT_H
+                    start_point[1] = FRAME_H - h
 
                 first_rect = img[start_point[1]:end_point[1],start_point[0]:end_point[0]]
         elif np.min(l1) > 16:
@@ -337,6 +359,8 @@ while True:
 
     if box_color == (0,0,255):
         lock_done = True
+        RECT_H = 110
+        RECT_W = 110
         # print(np.array(lock_input_coords)==lock_code)
         if len(lock_input_coords) == len(lock_code) and (np.array(lock_input_coords) == lock_code).all():
             got_right = True
