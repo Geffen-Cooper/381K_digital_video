@@ -40,7 +40,7 @@ end_point = np.array([center_brc_x, center_brc_y])
 
 model = models.shufflenet_v2_x0_5(weights='DEFAULT')
 model.fc = torch.nn.Linear(1024,4)
-model.load_state_dict(torch.load("ml/models/baseline.pth")['model_state_dict'])
+model.load_state_dict(torch.load("ml/models/baseline_finetune.pth")['model_state_dict'])
 model.eval()
 
 start_tracking = False
@@ -196,6 +196,7 @@ while True:
                 start_point[1] = center[1]-SEARCH_SIZE+y
                 end_point[0] = center[0]-SEARCH_SIZE+x+w
                 end_point[1] = center[1]-SEARCH_SIZE+y+h
+                # need to account for cases where hit the edge
         else:
             box_color = (0,150,0)
         print(f"best match: ({y_off},{x_off}) after {count} diffs, curr diff: {np.min(l1)}, running diff: {int(running_l1)}, max diff: {int(max_l1)}") 

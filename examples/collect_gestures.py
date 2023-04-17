@@ -22,11 +22,12 @@ hands = mp_hands.Hands(model_complexity=1,
         min_tracking_confidence=0.5)
 
 # gesture description strings
-descriptions = ["Swipe Hand Left","Swipe Hand Right","Swipe Hand Up","Swipe Hand Down",\
-                "Swipe Two Fingers Left","Swipe Two Fingers Right","Swipe Two Fingers Up","Swipe Two FIngers Down",\
-                "Swipe Index Finger Down","Beckon With Hand","Expand Hand","Jazz Hand","One Finger Up","Two Fingers Up","THree Fingers Up",\
-                "Lift Hand Up","Move Hand Down","Move Hand Forward","Beckon With Arm","TwoFingers Clockwise","Two Fingers CounterClockwise",
-                "Two Fingers Forward","Close Hand","Thumbs Up","OK"]
+# descriptions = ["Swipe Hand Left","Swipe Hand Right","Swipe Hand Up","Swipe Hand Down",\
+#                 "Swipe Two Fingers Left","Swipe Two Fingers Right","Swipe Two Fingers Up","Swipe Two FIngers Down",\
+#                 "Swipe Index Finger Down","Beckon With Hand","Expand Hand","Jazz Hand","One Finger Up","Two Fingers Up","THree Fingers Up",\
+#                 "Lift Hand Up","Move Hand Down","Move Hand Forward","Beckon With Arm","TwoFingers Clockwise","Two Fingers CounterClockwise",
+#                 "Two Fingers Forward","Close Hand","Thumbs Up","OK"]
+descriptions = ["Hookem","Normal Wave","Shaka","Scissors","50-50","Rock","Talking"]
 
 # convert a csv to a media pipe landmark object for visualization
 def csv_to_mp_landmark(file):
@@ -61,7 +62,7 @@ W = cap.get(cv2.CAP_PROP_FRAME_WIDTH)
 H = cap.get(cv2.CAP_PROP_FRAME_HEIGHT) 
 
 # create a window
-cv2.namedWindow("window", cv2.WINDOW_NORMAL)
+cv2.namedWindow("current gesture", cv2.WINDOW_NORMAL)
 
 # measure FPS
 last_frame_time = 0
@@ -176,11 +177,11 @@ while True:
    
     # display text on screen 
     cv2.putText(image, fps, (80, 20), font, 0.5, (0, 0, 0), 1, cv2.LINE_AA)
-    cv2.putText(image, "class: "+files_collected[class_num][-1].split('_')[1],\
+    cv2.putText(image, "class: "+str(class_num),\
                  (0, 20), font, 0.5, (0, 0, 0), 1, cv2.LINE_AA)
     cv2.putText(image, descriptions[class_num], (0, 40), font, 0.5, (0, 0, 0), 1, cv2.LINE_AA)
     
-    cv2.imshow('window',image)
+    cv2.imshow('current gesture',image)
 
     # display last collected sample
     if not hand_in_frame and len(files_collected[class_num]) > 0:
@@ -211,13 +212,13 @@ while True:
         break
     elif k == ord('c'):
         class_num += 1
-        if class_num == 25:
+        if class_num == len(descriptions):
             class_num = 0
         print(f"Switched to Class {class_num}")
     elif k == ord('x'):
         class_num -= 1
         if class_num == -1:
-            class_num = 24
+            class_num = len(descriptions)-1
         print(f"Switched to Class {class_num}")
     elif k == ord('d'):
         print(f"Deleting {files_collected[class_num][-1]}")

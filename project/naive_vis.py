@@ -3,6 +3,8 @@ import time
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib import cm
+from tqdm import tqdm
+import os
 
 DEBUG_MODE = False
 
@@ -11,7 +13,7 @@ RECT_W = 100
 RECT_H = 100
 # RECT_Vx = 10
 # RECT_Vy = 10
-SEARCH_SIZE = 150
+SEARCH_SIZE = 112
 
 # initialize the capture object
 cap = cv2.VideoCapture(0)
@@ -167,6 +169,79 @@ def diamond_search(last_frame, reference_patch):
     
     return rel_locs
 
+def visualize_diff(ref_img,next_img,last_rect_px,sy,sx,start_point,end_point,count):
+    l1 = np.zeros((sy.shape[0],sx.shape[1]))
+    # get the rows of sx and sy
+    for i,(xr,yr) in enumerate(zip(sx,sy)):
+        # get the columns of xr and yr
+        for j,(xc,yc) in enumerate(zip(xr,yr)):
+            try:
+                pred_px = next_img[start_point[1]+yc:end_point[1]+yc,start_point[0]+xc:end_point[0]+xc]
+                # pred_pxb = imgb[start_point[1]+yc:end_point[1]+yc,start_point[0]+xc:end_point[0]+xc]
+                l1[i,j] = np.mean(np.abs(pred_px.astype(int)-last_rect_px.astype(int)))
+                # l1b[i,j] = np.sum(np.abs(pred_pxb.astype(int)-last_rect_px.astype(int)))
+            except:
+                print("Exception")
+                print(start_point,end_point)
+                print(i,j,xc,yc)
+                # print(pred_px.shape)
+                print(last_rect_px.shape)
+                exit()
+    diamond_points = np.array(diamond_search(next_img,last_rect_px))
+    # print(diamond_points[-1])
+    overlay = next_img.copy()
+    cv2.rectangle(overlay, start_point-SEARCH_SIZE, end_point+SEARCH_SIZE, (0,0,255), -1)
+    next_img = cv2.addWeighted(overlay, 0.2, next_img, 1 - 0.2, 0)
+    cv2.rectangle(next_img, start_point, end_point, (0,0,255), 4)
+    cv2.circle(img, (start_point[0]+50,start_point[1]+50), radius=6, color=(0, 0, 255), thickness=-1)
+    
+    closest = np.argmin(l1)
+    col = (closest % (SEARCH_SIZE+SEARCH_SIZE+1))
+    row = (closest // (SEARCH_SIZE+SEARCH_SIZE+1))
+    y_rel = row-SEARCH_SIZE
+    x_rel = col-SEARCH_SIZE
+    # print(row,col,x_rel,y_rel,closest)
+    cv2.rectangle(next_img, (start_point[0]+x_rel,start_point[1]+y_rel), (end_point[0]+x_rel,end_point[1]+y_rel), (0,255,0), 4)
+    cv2.circle(next_img, (start_point[0]+50+x_rel,start_point[1]+50+y_rel), radius=6, color=(0, 255, 0), thickness=-1)
+    fig = plt.figure(figsize=(14,4))
+    ax3d = fig.add_subplot(1, 3, 1, projection='3d')
+    # ax3db = fig.add_subplot(1, 4, 2, projection='3d')
+    ax3d.scatter(x_rel,-y_rel,np.min(l1),c='r')
+    ax3d.scatter(diamond_points[:,1],-diamond_points[:,0],diamond_points[:,2]+1,c='k',s=2)
+    ax3d.set_title("relative delta: ("+str(x_rel)+","+str(y_rel)+")")
+    ax3d.set_yticks([-SEARCH_SIZE,-SEARCH_SIZE/2,0,SEARCH_SIZE/2,SEARCH_SIZE])
+    ax3d.set_yticklabels([str(SEARCH_SIZE),str(SEARCH_SIZE/2),'0',str(-SEARCH_SIZE/2),str(-SEARCH_SIZE)])
+    ax3d.set_xticks([-SEARCH_SIZE,-SEARCH_SIZE/2,0,SEARCH_SIZE/2,SEARCH_SIZE])
+    ax3d.set_xticklabels([str(-SEARCH_SIZE),str(-SEARCH_SIZE/2),'0',str(SEARCH_SIZE/2),str(SEARCH_SIZE)])
+    # ax3db.set_zlim([0,1.5e6])
+    # ax3d.set_zlim([0,1.5e6])
+    ax_before = fig.add_subplot(1,3,2)
+    ax_after = fig.add_subplot(1,3,3)
+    ax3d.plot_surface(sx,-sy,l1, cmap=cm.coolwarm,alpha=0.35,edgecolor='gray', lw=0.5, rstride=8, cstride=8,)
+    ax3d.contour(sx, -sy, l1, zdir='z', offset=10, cmap='coolwarm')
+    # ax3db.plot_surface(sx,-sy,l1b, cmap=cm.coolwarm)
+    ax3d.set_xlabel("x - horizontal")
+    ax3d.set_ylabel("y - vertical")
+    ax_before.imshow(cv2.cvtColor(ref_img, cv2.COLOR_BGR2RGB))
+    ax_before.set_title("last frame")
+    ax_after.imshow(cv2.cvtColor(next_img, cv2.COLOR_BGR2RGB))
+    ax_after.set_title("current frame")
+    ax_after.text(FRAME_W//2-(SEARCH_SIZE+RECT_W//2)-40,FRAME_H//2-(SEARCH_SIZE+RECT_H//2),"("+str(-SEARCH_SIZE)+","+str(-SEARCH_SIZE)+")",c='w',size=5)
+    ax_after.text(FRAME_W//2+(SEARCH_SIZE+RECT_W//2)-40,FRAME_H//2-(SEARCH_SIZE+RECT_H//2),"("+str(SEARCH_SIZE)+","+str(-SEARCH_SIZE)+")",c='w',size=5)
+    ax_after.text(FRAME_W//2-(SEARCH_SIZE+RECT_W//2)-40,FRAME_H//2+(SEARCH_SIZE+RECT_H//2),"("+str(-SEARCH_SIZE)+","+str(SEARCH_SIZE)+")",c='w',size=5)
+    ax_after.text(FRAME_W//2+(SEARCH_SIZE+RECT_W//2)-40,FRAME_H//2+(SEARCH_SIZE+RECT_H//2),"("+str(SEARCH_SIZE)+","+str(SEARCH_SIZE)+")",c='w',size=5)
+    offset = 0
+    if x_rel < 0:
+        offset += 7
+    if y_rel < 0:
+        offset += 7
+    ax_after.text(FRAME_W//2-25-offset+x_rel,FRAME_H//2-15+y_rel,"("+str(x_rel)+","+str(y_rel)+")",c=(0,1,0),size=5)
+    
+    fig.savefig("frame_"+str(count)+".png",dpi=300)
+
+stop_tracking = False
+track_count = 0
+ref_frame = None
 
 # start loop
 while True:
@@ -177,97 +252,37 @@ while True:
 
     # flip horizontally
     img = cv2.flip(img,1)
-    # imgb = cv2.GaussianBlur(img,(7,7),2,2)
 
     # === Rectangle tracking update ===
     # update position
     if start_tracking:
-        l1 = np.zeros((sy.shape[0],sx.shape[1]))
-        # l1b = np.zeros((sy.shape[0],sx.shape[1]))
-        # print(l1.shape)
-        # get the rows of sx and sy
-        for i,(xr,yr) in enumerate(zip(sx,sy)):
-            # get the columns of xr and yr
-            for j,(xc,yc) in enumerate(zip(xr,yr)):
-                try:
-                    pred_px = img[start_point[1]+yc:end_point[1]+yc,start_point[0]+xc:end_point[0]+xc]
-                    # pred_pxb = imgb[start_point[1]+yc:end_point[1]+yc,start_point[0]+xc:end_point[0]+xc]
-                    l1[i,j] = np.mean(np.abs(pred_px.astype(int)-last_rect_px.astype(int)))
-                    # l1b[i,j] = np.sum(np.abs(pred_pxb.astype(int)-last_rect_px.astype(int)))
-                except:
-                    print(start_point,end_point)
-                    print(i,j,xc,yc)
-                    print(pred_px.shape)
-                    print(last_rect_px.shape)
-                    exit()
-        diamond_points = np.array(diamond_search(img,last_rect_px))
-        print(diamond_points[-1])
-        overlay = img.copy()
-        cv2.rectangle(overlay, start_point-SEARCH_SIZE, end_point+SEARCH_SIZE, (0,0,255), -1)
-        img = cv2.addWeighted(overlay, 0.2, img, 1 - 0.2, 0)
-        cv2.rectangle(img, start_point, end_point, (0,0,255), 4)
-        cv2.circle(img, (start_point[0]+50,start_point[1]+50), radius=6, color=(0, 0, 255), thickness=-1)
+        print(f"tracking: {track_count}")
+        if ref_frame is None:
+            ref_frame = img
+            last_rect_px = img[start_point[1]:end_point[1],start_point[0]:end_point[0]].copy()
         
-        cv2.imwrite("curr.png",img)
-        cv2.imwrite("last.png",last_img)
-        
-        closest = np.argmin(l1)
-        col = (closest % (SEARCH_SIZE+SEARCH_SIZE+1))
-        row = (closest // (SEARCH_SIZE+SEARCH_SIZE+1))
-        y_rel = row-SEARCH_SIZE
-        x_rel = col-SEARCH_SIZE
-        # print(row,col,x_rel,y_rel,closest)
-        cv2.rectangle(img, (start_point[0]+x_rel,start_point[1]+y_rel), (end_point[0]+x_rel,end_point[1]+y_rel), (0,255,0), 4)
-        cv2.circle(img, (start_point[0]+50+x_rel,start_point[1]+50+y_rel), radius=6, color=(0, 255, 0), thickness=-1)
-        fig = plt.figure(figsize=(14,4))
-        ax3d = fig.add_subplot(1, 3, 1, projection='3d')
-        # ax3db = fig.add_subplot(1, 4, 2, projection='3d')
-        ax3d.scatter(x_rel,-y_rel,np.min(l1),c='r')
-        ax3d.scatter(diamond_points[:,1],-diamond_points[:,0],diamond_points[:,2]+1,c='k',s=2)
-        ax3d.set_title("relative delta: ("+str(x_rel)+","+str(y_rel)+")")
-        ax3d.set_yticks([-SEARCH_SIZE,-SEARCH_SIZE/2,0,SEARCH_SIZE/2,SEARCH_SIZE])
-        ax3d.set_yticklabels([str(SEARCH_SIZE),str(SEARCH_SIZE/2),'0',str(-SEARCH_SIZE/2),str(-SEARCH_SIZE)])
-        ax3d.set_xticks([-SEARCH_SIZE,-SEARCH_SIZE/2,0,SEARCH_SIZE/2,SEARCH_SIZE])
-        ax3d.set_xticklabels([str(-SEARCH_SIZE),str(-SEARCH_SIZE/2),'0',str(SEARCH_SIZE/2),str(SEARCH_SIZE)])
-        # ax3db.set_zlim([0,1.5e6])
-        # ax3d.set_zlim([0,1.5e6])
-        ax_before = fig.add_subplot(1,3,2)
-        ax_after = fig.add_subplot(1,3,3)
-        ax3d.plot_surface(sx,-sy,l1, cmap=cm.coolwarm,alpha=0.35,edgecolor='gray', lw=0.5, rstride=8, cstride=8,)
-        ax3d.contour(sx, -sy, l1, zdir='z', offset=10, cmap='coolwarm')
-        # ax3db.plot_surface(sx,-sy,l1b, cmap=cm.coolwarm)
-        ax3d.set_xlabel("x - horizontal")
-        ax3d.set_ylabel("y - vertical")
-        ax_before.imshow(cv2.cvtColor(last_img, cv2.COLOR_BGR2RGB))
-        ax_before.set_title("last frame")
-        ax_after.imshow(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
-        ax_after.set_title("current frame")
-        ax_after.text(FRAME_W//2-(SEARCH_SIZE+RECT_W//2)-40,FRAME_H//2-(SEARCH_SIZE+RECT_H//2),"("+str(-SEARCH_SIZE)+","+str(-SEARCH_SIZE)+")",c='w',size=5)
-        ax_after.text(FRAME_W//2+(SEARCH_SIZE+RECT_W//2)-40,FRAME_H//2-(SEARCH_SIZE+RECT_H//2),"("+str(SEARCH_SIZE)+","+str(-SEARCH_SIZE)+")",c='w',size=5)
-        ax_after.text(FRAME_W//2-(SEARCH_SIZE+RECT_W//2)-40,FRAME_H//2+(SEARCH_SIZE+RECT_H//2),"("+str(-SEARCH_SIZE)+","+str(SEARCH_SIZE)+")",c='w',size=5)
-        ax_after.text(FRAME_W//2+(SEARCH_SIZE+RECT_W//2)-40,FRAME_H//2+(SEARCH_SIZE+RECT_H//2),"("+str(SEARCH_SIZE)+","+str(SEARCH_SIZE)+")",c='w',size=5)
-        offset = 0
-        if x_rel < 0:
-            offset += 7
-        if y_rel < 0:
-            offset += 7
-        ax_after.text(FRAME_W//2-25-offset+x_rel,FRAME_H//2-15+y_rel,"("+str(x_rel)+","+str(y_rel)+")",c=(0,1,0),size=5)
-        
-        # plt.colorbar(bar)
-        start_tracking = False
-        # print(l1[:5,:5])
-        # print(l1b[:5,:5])
-        fig.show()
+        last_img = img
+        cv2.imwrite("viz_frames\\frame_"+str(track_count)+".png",img)
+        track_count += 1
     
-    last_imgb = cv2.GaussianBlur(img,(7,7),0.5,0.5)
-    last_rect_px = img[start_point[1]:end_point[1],start_point[0]:end_point[0]]
-    last_rect_pxb = last_imgb[start_point[1]:end_point[1],start_point[0]:end_point[0]]
-    last_img = img
-    cv2.imwrite("last_rec.png",last_rect_px)
-    
-    cv2.rectangle(img, start_point, end_point, (0,0,255), 4)
-    cv2.circle(img, (start_point[0]+RECT_W//2,start_point[1]+RECT_H//2), radius=6, color=(0, 0, 255), thickness=-1)
   
+    if stop_tracking == True:
+        frames = os.listdir("viz_frames")
+        frames.sort(key=lambda f: int(f.split('_')[1][:-4]))
+        print(frames)
+        idx = 0
+        ref_frame = cv2.imread("viz_frames\\"+frames[0])
+
+        cv2.imwrite("ref.png",ref_frame)
+        cv2.imwrite("ref_rect.png",last_rect_px)
+
+        for frame in tqdm(frames[1:]):
+            next_frame = cv2.imread("viz_frames\\"+frame)
+            cv2.imwrite("next.png",next_frame)
+            visualize_diff(ref_frame,next_frame,last_rect_px,sy,sx,start_point,end_point,idx)
+            idx += 1
+
+
     # # calculate the fps
     # frame_count += 1
     # curr_frame_time = time.time()
@@ -279,6 +294,9 @@ while True:
 
     # # img, text, location of BLC, font, size, color, thickness, linetype
     # cv2.putText(img, fps+", "+str(int(FRAME_W))+"x"+str(int(FRAME_H)), (7, 30), font, 1, (100, 255, 0), 1, cv2.LINE_AA)
+    
+    cv2.rectangle(img, start_point, end_point, (0,0,255), 4)
+    cv2.circle(img, (start_point[0]+RECT_W//2,start_point[1]+RECT_H//2), radius=6, color=(0, 0, 255), thickness=-1)
     cv2.imshow('window',img)
 
     # get key
@@ -289,3 +307,6 @@ while True:
         break
     elif k == ord('s'):
         start_tracking = True
+    elif k == ord('e'):
+        start_tracking = False
+        stop_tracking = True

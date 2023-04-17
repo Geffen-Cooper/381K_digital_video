@@ -8,7 +8,7 @@ W = cap.get(cv2.CAP_PROP_FRAME_WIDTH)
 H = cap.get(cv2.CAP_PROP_FRAME_HEIGHT) 
 
 # create a window
-cv2.namedWindow("window", cv2.WINDOW_NORMAL)
+cv2.namedWindow("data collection", cv2.WINDOW_NORMAL)
 
 # measure FPS
 last_frame_time = 0
@@ -101,8 +101,8 @@ while True:
         last_frame_time = curr_frame_time
         frame_count = 0
     # img, text, location of BLC, font, size, color, thickness, linetype
-    cv2.putText(img_disp, fps+", "+str(int(W))+"x"+str(int(H)), (7, 30), font, 1, (100, 255, 0), 1, cv2.LINE_AA)
-    cv2.imshow('window',img_disp)
+    cv2.putText(img_disp, fps+", "+str(int(W))+"x"+str(int(H)), (7, 30), font, 1, (0, 0, 0), 1, cv2.LINE_AA)
+    cv2.imshow('data collection',img_disp)
 
     # quit when click 'q' on keyboard
     # get key
@@ -136,13 +136,13 @@ while True:
         if outer_start_point[0] < 0:
             outer_start_point[0] = 0
             outer_end_point[0] = outer_start_point[0] + MAX_R_W
-        elif outer_start_point[1] < 0:
+        if outer_start_point[1] < 0:
             outer_start_point[1] = 0
             outer_end_point[1] = outer_start_point[1] + MAX_R_H
-        elif outer_end_point[0] > W:
+        if outer_end_point[0] > W:
             outer_end_point[0] = W-1
             outer_start_point[0] = outer_end_point[0] - MAX_R_W
-        elif outer_end_point[1] > H:
+        if outer_end_point[1] > H:
             outer_end_point[1] = H-1
             outer_start_point[1] = outer_end_point[1] - MAX_R_H
         

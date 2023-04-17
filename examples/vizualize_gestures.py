@@ -23,11 +23,12 @@ hands = mp_hands.Hands(model_complexity=1,
         min_tracking_confidence=0.5)
 
 # gesture description strings
-descriptions = ["Swipe Hand Left","Swipe Hand Right","Swipe Hand Up","Swipe Hand Down",\
-                "Swipe Two Fingers Left","Swipe Two Fingers Right","Swipe Two Fingers Up","Swipe Two FIngers Down",\
-                "Swipe Index Finger Down","Beckon With Hand","Expand Hand","Jazz Hand","One Finger Up","Two Fingers Up","THree Fingers Up",\
-                "Lift Hand Up","Move Hand Down","Move Hand Forward","Beckon With Arm","TwoFingers Clockwise","Two Fingers CounterClockwise",
-                "Two Fingers Forward","Close Hand","Thumbs Up","OK"]
+# descriptions = ["Swipe Hand Left","Swipe Hand Right","Swipe Hand Up","Swipe Hand Down",\
+#                 "Swipe Two Fingers Left","Swipe Two Fingers Right","Swipe Two Fingers Up","Swipe Two FIngers Down",\
+#                 "Swipe Index Finger Down","Beckon With Hand","Expand Hand","Jazz Hand","One Finger Up","Two Fingers Up","THree Fingers Up",\
+#                 "Lift Hand Up","Move Hand Down","Move Hand Forward","Beckon With Arm","TwoFingers Clockwise","Two Fingers CounterClockwise",
+#                 "Two Fingers Forward","Close Hand","Thumbs Up","OK"]
+descriptions = ["Hookem","Wave","Shaka","Scissors","50-50","Rock","Talking"]
 
 # convert a csv to a media pipe landmark object for visualization
 def csv_to_mp_landmark(file):
@@ -91,7 +92,7 @@ while True:
     cv2.putText(blank, "class: "+files_collected[class_num][-1].split('_')[1] +" ("+str(count+1)+"/"+str(len(files_collected[class_num]))+")",\
                  (0, 20), font, 0.5, (0, 255, 0), 1, cv2.LINE_AA)
     cv2.putText(blank, descriptions[class_num], (0, 40), font, 0.5, (0, 255, 0), 1, cv2.LINE_AA)
-    cv2.imshow('last sequence',blank)
+    cv2.imshow('collected gesture',blank)
     seq_idx += 1
 
     # get key
