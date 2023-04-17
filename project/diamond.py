@@ -190,12 +190,29 @@ while True:
                 input = transforms.ToTensor()(img[center[1]-SEARCH_SIZE:center[1]+SEARCH_SIZE,center[0]-SEARCH_SIZE:center[0]+SEARCH_SIZE]).unsqueeze(0)
                 out = model(input)*224
                 x,y,w,h = int(out[0][0]),int(out[0][1]),int(out[0][2]),int(out[0][3])
-                first_rect = img[center[1]-SEARCH_SIZE+y:center[1]-SEARCH_SIZE+y+h,\
-                                 center[0]-SEARCH_SIZE+x:center[0]-SEARCH_SIZE+x+w]
+                # first_rect = img[center[1]-SEARCH_SIZE+y:center[1]-SEARCH_SIZE+y+h,\
+                #                  center[0]-SEARCH_SIZE+x:center[0]-SEARCH_SIZE+x+w]
                 start_point[0] = center[0]-SEARCH_SIZE+x
                 start_point[1] = center[1]-SEARCH_SIZE+y
                 end_point[0] = center[0]-SEARCH_SIZE+x+w
                 end_point[1] = center[1]-SEARCH_SIZE+y+h
+
+                # check collision
+                if start_point[0] <= 0: # left
+                    start_point[0] = 0
+                    end_point[0] = RECT_W
+                if start_point[1] <= 0: # top
+                    start_point[1] = 0
+                    end_point[1] = RECT_H
+                if end_point[0] >= FRAME_W: # right
+                    end_point[0] = FRAME_W
+                    start_point[0] = FRAME_W - RECT_W
+                if end_point[1] >= FRAME_H: # bottom
+                    end_point[1] = FRAME_H
+                    start_point[1] = FRAME_H - RECT_H
+
+                first_rect = img[start_point[1]:end_point[1],start_point[0]:end_point[0]]
+
                 # need to account for cases where hit the edge
         else:
             box_color = (0,150,0)

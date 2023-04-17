@@ -297,14 +297,14 @@ while True:
             point_pos = np.array([(row+1)*edge_len_y,col*edge_len_y+edge_locs_x_offset])
             dist_to_center = np.sqrt(np.sum(np.square(cursor_pos_comp-point_pos)))
             
-            if dist_to_center < 9 and np.array([row,col] != lock_input_coords[-1]):
+            if dist_to_center < 9 and np.array([row,col] != lock_input_coords[-1]) and not got_right:
                 lock_input_coords.append([row,col])
 
 
     for i,selected in enumerate(lock_input_coords):
         # last coord goes to cursor
         if i + 1 == len(lock_input_coords):
-            if not lock_done:
+            if not got_right:
                 coords_start = lock_points[lock_input_coords[i][0],lock_input_coords[i][1]]
                 cv2.arrowedLine(img_disp, (int(coords_start[1]),int(coords_start[0])), cursor_pos,arrow_color, 2)
         else:
