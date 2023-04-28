@@ -169,7 +169,9 @@ def diamond_search(last_frame, reference_patch):
     
     return rel_locs
 
+min_error = 1e10
 def visualize_diff(ref_img,next_img,last_rect_px,sy,sx,start_point,end_point,count):
+    global min_error
     l1 = np.zeros((sy.shape[0],sx.shape[1]))
     # get the rows of sx and sy
     for i,(xr,yr) in enumerate(zip(sx,sy)):
@@ -196,11 +198,15 @@ def visualize_diff(ref_img,next_img,last_rect_px,sy,sx,start_point,end_point,cou
     cv2.circle(img, (start_point[0]+50,start_point[1]+50), radius=6, color=(0, 0, 255), thickness=-1)
     
     closest = np.argmin(l1)
+    curr_error = np.min(l1)
+    if curr_error < min_error:
+        min_error = curr_error
     col = (closest % (SEARCH_SIZE+SEARCH_SIZE+1))
     row = (closest // (SEARCH_SIZE+SEARCH_SIZE+1))
     y_rel = row-SEARCH_SIZE
     x_rel = col-SEARCH_SIZE
     # print(row,col,x_rel,y_rel,closest)
+    cv2.rectangle(ref_img, (start_point[0],start_point[1]), (end_point[0],end_point[1]), (0,255,0), 4)
     cv2.rectangle(next_img, (start_point[0]+x_rel,start_point[1]+y_rel), (end_point[0]+x_rel,end_point[1]+y_rel), (0,255,0), 4)
     cv2.circle(next_img, (start_point[0]+50+x_rel,start_point[1]+50+y_rel), radius=6, color=(0, 255, 0), thickness=-1)
     fig = plt.figure(figsize=(14,4))
@@ -208,22 +214,26 @@ def visualize_diff(ref_img,next_img,last_rect_px,sy,sx,start_point,end_point,cou
     # ax3db = fig.add_subplot(1, 4, 2, projection='3d')
     ax3d.scatter(x_rel,-y_rel,np.min(l1),c='r')
     ax3d.scatter(diamond_points[:,1],-diamond_points[:,0],diamond_points[:,2]+1,c='k',s=2)
-    ax3d.set_title("relative delta: ("+str(x_rel)+","+str(y_rel)+")")
-    ax3d.set_yticks([-SEARCH_SIZE,-SEARCH_SIZE/2,0,SEARCH_SIZE/2,SEARCH_SIZE])
-    ax3d.set_yticklabels([str(SEARCH_SIZE),str(SEARCH_SIZE/2),'0',str(-SEARCH_SIZE/2),str(-SEARCH_SIZE)])
-    ax3d.set_xticks([-SEARCH_SIZE,-SEARCH_SIZE/2,0,SEARCH_SIZE/2,SEARCH_SIZE])
-    ax3d.set_xticklabels([str(-SEARCH_SIZE),str(-SEARCH_SIZE/2),'0',str(SEARCH_SIZE/2),str(SEARCH_SIZE)])
+    
     # ax3db.set_zlim([0,1.5e6])
     # ax3d.set_zlim([0,1.5e6])
     ax_before = fig.add_subplot(1,3,2)
     ax_after = fig.add_subplot(1,3,3)
     ax3d.plot_surface(sx,-sy,l1, cmap=cm.coolwarm,alpha=0.35,edgecolor='gray', lw=0.5, rstride=8, cstride=8,)
+    ax3d.plot_surface(sx,-sy,np.ones(l1.shape)*min_error,alpha=0.2)
+    ax3d.plot_surface(sx,-sy,np.ones(l1.shape)*curr_error,alpha=0.2)
     ax3d.contour(sx, -sy, l1, zdir='z', offset=10, cmap='coolwarm')
+
+    ax3d.set_title("relative delta: ("+str(x_rel)+","+str(y_rel)+")\nmin error:"+str(round(min_error,3))+" current error:"+str(round(curr_error,3)))
+    ax3d.set_yticks([-SEARCH_SIZE,-SEARCH_SIZE/2,0,SEARCH_SIZE/2,SEARCH_SIZE])
+    ax3d.set_yticklabels([str(SEARCH_SIZE),str(SEARCH_SIZE/2),'0',str(-SEARCH_SIZE/2),str(-SEARCH_SIZE)])
+    ax3d.set_xticks([-SEARCH_SIZE,-SEARCH_SIZE/2,0,SEARCH_SIZE/2,SEARCH_SIZE])
+    ax3d.set_xticklabels([str(-SEARCH_SIZE),str(-SEARCH_SIZE/2),'0',str(SEARCH_SIZE/2),str(SEARCH_SIZE)])
     # ax3db.plot_surface(sx,-sy,l1b, cmap=cm.coolwarm)
     ax3d.set_xlabel("x - horizontal")
     ax3d.set_ylabel("y - vertical")
     ax_before.imshow(cv2.cvtColor(ref_img, cv2.COLOR_BGR2RGB))
-    ax_before.set_title("last frame")
+    ax_before.set_title("reference frame")
     ax_after.imshow(cv2.cvtColor(next_img, cv2.COLOR_BGR2RGB))
     ax_after.set_title("current frame")
     ax_after.text(FRAME_W//2-(SEARCH_SIZE+RECT_W//2)-40,FRAME_H//2-(SEARCH_SIZE+RECT_H//2),"("+str(-SEARCH_SIZE)+","+str(-SEARCH_SIZE)+")",c='w',size=5)
@@ -238,6 +248,7 @@ def visualize_diff(ref_img,next_img,last_rect_px,sy,sx,start_point,end_point,cou
     ax_after.text(FRAME_W//2-25-offset+x_rel,FRAME_H//2-15+y_rel,"("+str(x_rel)+","+str(y_rel)+")",c=(0,1,0),size=5)
     
     fig.savefig("frame_"+str(count)+".png",dpi=300)
+    plt.close()
 
 stop_tracking = False
 track_count = 0

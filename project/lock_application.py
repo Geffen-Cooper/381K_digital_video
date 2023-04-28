@@ -253,7 +253,7 @@ while True:
                     start_point[1] = FRAME_H - h
 
                 first_rect = img[start_point[1]:end_point[1],start_point[0]:end_point[0]]
-        elif np.min(l1) > 16:
+        elif np.min(l1) > 10:
             box_color = (0,0,255)
         else:
             box_color = (0,150,0)

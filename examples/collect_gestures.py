@@ -27,7 +27,7 @@ hands = mp_hands.Hands(model_complexity=1,
 #                 "Swipe Index Finger Down","Beckon With Hand","Expand Hand","Jazz Hand","One Finger Up","Two Fingers Up","THree Fingers Up",\
 #                 "Lift Hand Up","Move Hand Down","Move Hand Forward","Beckon With Arm","TwoFingers Clockwise","Two Fingers CounterClockwise",
 #                 "Two Fingers Forward","Close Hand","Thumbs Up","OK"]
-descriptions = ["Hookem","Normal Wave","Shaka","Scissors","50-50","Rock","Talking"]
+descriptions = ["Hookem","Wave","Shaka","Scissors","50-50","Rock","Talking"]
 
 # convert a csv to a media pipe landmark object for visualization
 def csv_to_mp_landmark(file):

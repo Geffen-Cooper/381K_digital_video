@@ -11,21 +11,22 @@ class App(object):
 
     def initializeTracker(self, image, trackerAlgorithm):
         while True:
-            if trackerAlgorithm == 'mil':
-                tracker = cv.TrackerMIL_create()
-            elif trackerAlgorithm == 'goturn':
-                params = cv.TrackerGOTURN_Params()
-                params.modelTxt = self.args.goturn
-                params.modelBin = self.args.goturn_model
-                tracker = cv.TrackerGOTURN_create(params)
-            elif trackerAlgorithm == 'dasiamrpn':
-                params = cv.TrackerDaSiamRPN_Params()
-                params.model = self.args.dasiamrpn_net
-                params.kernel_cls1 = self.args.dasiamrpn_kernel_cls1
-                params.kernel_r1 = self.args.dasiamrpn_kernel_r1
-                tracker = cv.TrackerDaSiamRPN_create(params)
-            else:
-                sys.exit("Tracker {} is not recognized. Please use one of three available: mil, goturn, dasiamrpn.".format(trackerAlgorithm))
+            tracker = cv.TrackerMOSSE_create()
+            # if trackerAlgorithm == 'mil':
+            #     tracker = cv.TrackerMIL_create()
+            # elif trackerAlgorithm == 'goturn':
+            #     params = cv.TrackerGOTURN_Params()
+            #     params.modelTxt = self.args.goturn
+            #     params.modelBin = self.args.goturn_model
+            #     tracker = cv.TrackerGOTURN_create(params)
+            # elif trackerAlgorithm == 'dasiamrpn':
+            #     params = cv.TrackerDaSiamRPN_Params()
+            #     params.model = self.args.dasiamrpn_net
+            #     params.kernel_cls1 = self.args.dasiamrpn_kernel_cls1
+            #     params.kernel_r1 = self.args.dasiamrpn_kernel_r1
+            #     tracker = cv.TrackerDaSiamRPN_create(params)
+            # else:
+            #     sys.exit("Tracker {} is not recognized. Please use one of three available: mil, goturn, dasiamrpn.".format(trackerAlgorithm))
 
             print('==> Select object ROI for tracker ...')
             bbox = cv.selectROI('tracking', image)

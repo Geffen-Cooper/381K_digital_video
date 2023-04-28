@@ -102,7 +102,8 @@ reset = False
 first_rect = None
 box_color = (0,150,0)
 
-
+draw_area = np.zeros((int(FRAME_H),int(FRAME_W)),dtype=np.uint8)
+cursor_pos = [start_point[1]+RECT_H//2,start_point[0]+RECT_W//2]
 
 # start loop
 while True:
@@ -183,7 +184,7 @@ while True:
             running_count = running_count*alpha + count*(1-alpha)
             if np.min(l1) > max_l1:
                 max_l1 = np.min(l1)
-        if np.min(l1) > 4:
+        if np.min(l1) > 10:
             box_color = (0,0,255)
             center = (start_point[0]+(end_point[0]-start_point[0])//2,start_point[1]+(end_point[1]-start_point[1])//2)
             with torch.no_grad():
@@ -233,8 +234,19 @@ while True:
                     start_point[1] = FRAME_H - h
 
                 first_rect = img[start_point[1]:end_point[1],start_point[0]:end_point[0]]
+
+        elif RECT_H*RECT_W > 6000 and RECT_H*RECT_W < 15000:
+            box_color = (255,0,0)
+        elif RECT_H*RECT_W < 7000:
+            draw_area[:,:] = 0
+
         else:
             box_color = (0,150,0)
+            center = (start_point[0]+(end_point[0]-start_point[0])//2,start_point[1]+(end_point[1]-start_point[1])//2)
+            draw_area[center[1]-5:center[1]+5,center[0]-5:center[0]+5] = 1
+
+        
+            
         # print(f"best match: ({y_off},{x_off}) after {count} diffs, curr diff: {np.min(l1)}, running diff: {int(running_l1)}, max diff: {int(max_l1)}") 
        
         # update the position after tracking
@@ -296,6 +308,8 @@ while True:
     cv2.putText(img_disp, "Avg. Diffs: "+str(round(running_count,1)), (300-90, 23+32), font, 0.5, (0, 0, 0), 1, cv2.LINE_AA)
     cv2.rectangle(img_disp,(300+50,8+30),(620,30+30),(0,0,0),1)
     cv2.rectangle(img_disp,(304+50,12+30),(304+50+int((615-305)*running_count/500),26+30),(0,0,0),-1)
+
+    img_disp[draw_area == 1] = [255,0,0]
     cv2.imshow("("+str(int(FRAME_W))+"x"+str(int(FRAME_H))+")",img_disp)
 
     # get key

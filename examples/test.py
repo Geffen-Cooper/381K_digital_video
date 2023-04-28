@@ -82,7 +82,7 @@ W = cap.get(cv2.CAP_PROP_FRAME_WIDTH)
 H = cap.get(cv2.CAP_PROP_FRAME_HEIGHT) 
 
 # create a window
-cv2.namedWindow("window", cv2.WINDOW_NORMAL)
+cv2.namedWindow(str(int(W))+"x"+str(int(H)), cv2.WINDOW_NORMAL)
 
 # measure FPS
 last_frame_time = 0
@@ -97,6 +97,7 @@ no_hand_count = 0
 hand_in_frame = False
 
 # start loop
+i = 0
 while True:
     # try to read a frame
     ret,img = cap.read()
@@ -125,12 +126,12 @@ while True:
             df = pd.DataFrame(columns=col_names)
         
         for hand_landmarks in results.multi_hand_landmarks:
-            mp_drawing.draw_landmarks(
-                img,
-                hand_landmarks,
-                mp_hands.HAND_CONNECTIONS,
-                mp_drawing_styles.get_default_hand_landmarks_style(),
-                mp_drawing_styles.get_default_hand_connections_style())
+            # mp_drawing.draw_landmarks(
+            #     img,
+            #     hand_landmarks,
+            #     mp_hands.HAND_CONNECTIONS,
+            #     mp_drawing_styles.get_default_hand_landmarks_style(),
+            #     mp_drawing_styles.get_default_hand_connections_style())
             lm_list_x = []
             lm_list_y = []
             lm_list_z = []
@@ -164,14 +165,14 @@ while True:
 
         landmarks_seq = transforms.ToTensor()(landmarks_seq).float()
 
-        with torch.no_grad():
-            model.eval()
-            pred = F.softmax(model(landmarks_seq))
+        # with torch.no_grad():
+        #     model.eval()
+        #     pred = F.softmax(model(landmarks_seq))
 
-        print("prediction:")
-        val,idxs = torch.topk(pred,5)
-        for i in range(5):
-            print(f"{descriptions[idxs[0][i]]}, {val[0][i]}")
+        # print("prediction:")
+        # val,idxs = torch.topk(pred,5)
+        # for i in range(5):
+        #     print(f"{descriptions[idxs[0][i]]}, {val[0][i]}")
         count = 0
         no_hand_count = 0
     
@@ -187,8 +188,10 @@ while True:
         last_frame_time = curr_frame_time
         frame_count = 0
     # img, text, location of BLC, font, size, color, thickness, linetype
-    cv2.putText(img, fps+", "+str(int(W))+"x"+str(int(H)), (7, 30), font, 1, (100, 255, 0), 1, cv2.LINE_AA)
-    cv2.imshow('window',img)
+    cv2.putText(img, fps, (7, 30), font, 1, (0, 0, 0), 1, cv2.LINE_AA)
+    cv2.imshow(str(int(W))+"x"+str(int(H)),img)
+    cv2.imwrite("frame_"+str(i)+".png",img)
+    i += 1
 
     # quit when click 'q' on keyboard
     if cv2.waitKey(1) & 0xFF == ord('q'):

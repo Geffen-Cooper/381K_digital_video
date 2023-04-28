@@ -224,12 +224,12 @@ while True:
             df = pd.DataFrame(columns=col_names)
         
         for hand_landmarks in results.multi_hand_landmarks:
-            mp_drawing.draw_landmarks(
-                img,
-                hand_landmarks,
-                mp_hands.HAND_CONNECTIONS,
-                mp_drawing_styles.get_default_hand_landmarks_style(),
-                mp_drawing_styles.get_default_hand_connections_style())
+            # mp_drawing.draw_landmarks(
+            #     img,
+            #     hand_landmarks,
+            #     mp_hands.HAND_CONNECTIONS,
+            #     mp_drawing_styles.get_default_hand_landmarks_style(),
+            #     mp_drawing_styles.get_default_hand_connections_style())
             lm_list_x = []
             lm_list_y = []
             lm_list_z = []

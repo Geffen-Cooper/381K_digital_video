@@ -30,6 +30,7 @@ while True:
         if count == len(files):
             count = 0
         displayed = False
+        cv2.imwrite(f"collected_{count}.png",img)
     if k == ord('b'):
         count -= 1
         if count == -1:
